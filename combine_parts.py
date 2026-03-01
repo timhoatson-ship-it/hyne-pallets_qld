@@ -1,6 +1,0 @@
-__pycache__/
-*.pyc
-*.pyo
-.env
-*.db
-!data.db
