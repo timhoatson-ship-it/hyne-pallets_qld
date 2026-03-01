@@ -438,7 +438,7 @@ const Dashboard = ({ token, isOps = false }) => {
       <div>
         <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Today's Production by Zone</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {zones.map(z => (
+          {['VIK','HMP','DTL','CRT'].map(code => zones.find(z=>z.code===code)).filter(Boolean).map(z => (
             <div key={z.code} className="stat-card" style={{borderLeftColor: z.sessions_today > 0 ? '#22C55E' : '#ABBFC8'}}>
               <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">{z.zone_name}</div>
               <div className="text-3xl font-black text-[#07324C] mt-1">{z.units_produced.toLocaleString()}</div>
@@ -1884,7 +1884,11 @@ const MachineColHeader = ({ machine, slot }) => {
 };
 
 const PlanningBoard = ({ token }) => {
-  const [dayOffset, setDayOffset] = useState(0); // days from current Monday
+  // Default: start on today (offset from Monday of current week)
+  const [dayOffset, setDayOffset] = useState(() => {
+    const now = new Date(); const d = now.getDay();
+    return d === 0 ? 6 : d - 1; // Mon=0, Tue=1 ... Sun=6
+  });
   const [numDays, setNumDays] = useState(5); // default Mon-Fri
   const [activeTab, setActiveTab] = useState('viking'); // 'viking' | 'handmade' | 'dtl' | 'crates'
   const [planData, setPlanData] = useState(null);
@@ -3319,7 +3323,7 @@ const FloorTablet = ({ token, user }) => {
       {/* Complete + switch */}
       <div className="flex gap-3">
         {pct >= 100 && (
-          <button className="btn btn-success btn-xl flex-1 justify-center" onClick={completeSession}>
+          <button className="btn btn-success btn-xl flex-1 justify-center" onClick={()=>completeSession(false)}>
             ✓ Complete Order
           </button>
         )}
@@ -3971,7 +3975,11 @@ const RescheduleWOModal = ({ wo, newDate, newTruckId, trucks, onConfirm, onCance
 );
 
 const DispatchDashboard = ({ token }) => {
-  const [dayOffset, setDayOffset] = useState(0);
+  // Default: start on today (offset from Monday of current week)
+  const [dayOffset, setDayOffset] = useState(() => {
+    const now = new Date(); const d = now.getDay();
+    return d === 0 ? 6 : d - 1;
+  });
   const [numDays, setNumDays] = useState(5);
   const [activeTruck, setActiveTruck] = useState('all'); // 'all' or truck id
   const [subPage, setSubPage] = useState('planning'); // 'planning' | 'runsheet' | 'truckmanager'
