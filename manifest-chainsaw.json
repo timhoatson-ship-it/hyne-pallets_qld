@@ -1,0 +1,17 @@
+{
+  "name": "Hyne Pallets — Driver",
+  "short_name": "Driver",
+  "description": "Driver delivery and collection app",
+  "start_url": "/driver.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07324C",
+  "theme_color": "#07324C",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%2307324C'/%3E%3Cpath d='M50 120 L50 85 L65 65 L130 65 L145 85 L145 120 Z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/%3E%3Ccircle cx='75' cy='125' r='14' fill='%23ED1C24'/%3E%3Ccircle cx='120' cy='125' r='14' fill='%23ED1C24'/%3E%3Ctext x='96' y='160' text-anchor='middle' font-size='22' font-weight='bold' fill='white' font-family='Arial,sans-serif'%3EDRIVER%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

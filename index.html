@@ -1,5 +1,16 @@
 /* Hyne Pallets — Custom CSS (Tailwind supplements) */
 
+/* ── Global 2-size font bump ──────────────────────────────────── */
+html { font-size: 16px; }
+.text-xs { font-size: 14px !important; line-height: 1.4 !important; }
+.text-sm { font-size: 16px !important; line-height: 1.5 !important; }
+.text-base { font-size: 18px !important; }
+.text-lg { font-size: 20px !important; }
+.text-xl { font-size: 22px !important; }
+.text-2xl { font-size: 26px !important; }
+.text-3xl { font-size: 30px !important; }
+.text-4xl { font-size: 36px !important; }
+
 /* ── Scrollbars ───────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #F5F7FA; }
@@ -51,15 +62,15 @@
 .nav-item svg { flex-shrink: 0; }
 
 /* ── Tables ───────────────────────────────────────────────────── */
-.hp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hp-table { width: 100%; border-collapse: collapse; font-size: 16px; }
 .hp-table thead tr { background: #07324C; color: #FFFFFF; }
-.hp-table thead th { padding: 10px 14px; text-align: left; font-weight: 600; white-space: nowrap; }
+.hp-table thead th { padding: 12px 16px; text-align: left; font-weight: 600; white-space: nowrap; }
 .hp-table tbody tr:nth-child(even) { background: #F5F7FA; }
 .hp-table tbody tr:hover { background: #EBF2F5; }
-.hp-table tbody td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; color: #374151; }
+.hp-table tbody td { padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #374151; }
 
 /* ── Status Badges ────────────────────────────────────────────── */
-.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
 .badge-T { background: #e5e7eb; color: #6b7280; }
 .badge-C { background: #dbeafe; color: #1d4ed8; }
 .badge-R { background: #fef3c7; color: #92400e; }
@@ -87,7 +98,7 @@
 }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s; border: none; outline: none; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 16px; cursor: pointer; transition: all 0.15s; border: none; outline: none; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: #07324C; color: #fff; }
 .btn-primary:hover:not(:disabled) { background: #0a4060; }
@@ -101,9 +112,9 @@
 .btn-secondary:hover:not(:disabled) { background: #d1d5db; }
 .btn-outline { background: transparent; color: #07324C; border: 1.5px solid #07324C; }
 .btn-outline:hover:not(:disabled) { background: #07324C; color: #fff; }
-.btn-sm { padding: 5px 11px; font-size: 12px; }
-.btn-lg { padding: 12px 24px; font-size: 15px; }
-.btn-xl { padding: 18px 32px; font-size: 18px; font-weight: 700; border-radius: 10px; }
+.btn-sm { padding: 5px 11px; font-size: 15px; }
+.btn-lg { padding: 12px 24px; font-size: 18px; }
+.btn-xl { padding: 18px 32px; font-size: 22px; font-weight: 700; border-radius: 10px; }
 
 /* ── Form Inputs ──────────────────────────────────────────────── */
 .hp-input {
@@ -111,18 +122,18 @@
   padding: 8px 12px;
   border: 1.5px solid #d1d5db;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 16px;
   color: #374151;
   outline: none;
   transition: border-color 0.15s;
   background: #fff;
 }
 .hp-input:focus { border-color: #07324C; box-shadow: 0 0 0 3px rgba(7,50,76,0.12); }
-.hp-label { display: block; font-size: 12px; font-weight: 600; color: #5F545C; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.hp-label { display: block; font-size: 15px; font-weight: 600; color: #5F545C; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
 
 /* ── Tabs ─────────────────────────────────────────────────────── */
 .tab-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 0; }
-.tab-item { padding: 10px 20px; font-size: 13px; font-weight: 600; color: #5F545C; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
+.tab-item { padding: 10px 20px; font-size: 16px; font-weight: 600; color: #5F545C; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
 .tab-item:hover { color: #07324C; }
 .tab-item.active { color: #07324C; border-bottom-color: #07324C; }
 
@@ -138,7 +149,7 @@
   padding: 7px 9px;
   margin-bottom: 5px;
   cursor: grab;
-  font-size: 12px;
+  font-size: 15px;
   transition: box-shadow 0.15s;
 }
 .plan-item:hover { box-shadow: 0 2px 8px rgba(7,50,76,0.15); }
@@ -168,7 +179,7 @@
   border: 2px solid #e2e8f0;
   background: #fff;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 15px;
   cursor: pointer;
   transition: all 0.15s;
   color: #5F545C;
@@ -218,7 +229,7 @@
   padding: 12px 18px;
   border-radius: 8px;
   color: #fff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
   animation: toast-in 0.25s ease;
@@ -240,7 +251,7 @@
   position: relative;
 }
 .funnel-step::after {
-  content: '→';
+  content: '\2192';
   position: absolute;
   right: -10px;
   top: 50%;

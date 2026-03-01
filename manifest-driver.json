@@ -1,0 +1,2569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Hyne Pallets — Driver App</title>
+  <link rel="manifest" href="/manifest-driver.json" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#07324C',
+            'red-hp': '#ED1C24',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin:0; padding:0; background:#F5F7FA; font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+           font-size:18px; overscroll-behavior:none; }
+    html { font-size: 18px; }
+
+    /* Pin pad */
+    .pin-dot { width:18px; height:18px; border-radius:50%; border:2px solid #07324C; margin:0 8px; transition:all .15s; }
+    .pin-dot.filled { background:#07324C; }
+    .pin-key { width:80px; height:80px; border-radius:50%; border:2px solid #07324C; display:flex;
+               align-items:center; justify-content:center; font-size:28px; font-weight:600; color:#07324C;
+               cursor:pointer; user-select:none; transition:all .1s; background:white; }
+    .pin-key:active { background:#07324C; color:white; transform:scale(0.95); }
+    .pin-key.delete { border-color:#ED1C24; color:#ED1C24; font-size:16px; }
+    .pin-key.delete:active { background:#ED1C24; color:white; }
+
+    /* Timer pulse */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .pulse-dot { width:14px; height:14px; border-radius:50%; animation:pulse 1.5s ease-in-out infinite; display:inline-block; }
+
+    /* Stage colors */
+    .stage-waiting { background:#F59E0B; }
+    .stage-loading { background:#3B82F6; }
+    .stage-driving { background:#10B981; }
+    .stage-break { background:#6B7280; }
+    .stage-bar-waiting { border-left:5px solid #F59E0B; }
+    .stage-bar-loading { border-left:5px solid #3B82F6; }
+    .stage-bar-driving { border-left:5px solid #10B981; }
+    .stage-bar-break { border-left:5px solid #6B7280; }
+
+    /* Delivery card stripes */
+    .card-pending { border-left:5px solid #9CA3AF; }
+    .card-loaded { border-left:5px solid #3B82F6; }
+    .card-in_transit { border-left:5px solid #10B981; }
+    .card-delivered { border-left:5px solid #059669; }
+    .card-collected { border-left:5px solid #8B5CF6; }
+
+    /* Toast */
+    .toast-container { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; }
+    .toast { padding:12px 20px; border-radius:10px; color:white; font-size:16px; font-weight:500;
+             animation:slideIn .3s ease; min-width:280px; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+    .toast-success { background:#059669; }
+    .toast-error { background:#DC2626; }
+    .toast-info { background:#07324C; }
+    @keyframes slideIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+
+    /* Checkbox */
+    .safety-check { width:28px; height:28px; accent-color:#07324C; flex-shrink:0; }
+
+    /* Bottom action button */
+    .action-btn { position:fixed; bottom:80px; left:16px; right:16px; z-index:50; }
+    .action-btn button { width:100%; padding:20px; border-radius:16px; font-size:20px; font-weight:700;
+                         color:white; border:none; cursor:pointer; transition:all .15s; box-shadow:0 4px 16px rgba(0,0,0,.2); }
+    .action-btn button:active { transform:scale(0.98); }
+    .action-btn button:disabled { opacity:.4; cursor:not-allowed; }
+
+    /* Tabs */
+    .tab-bar { position:fixed; bottom:0; left:0; right:0; background:white; display:flex;
+               border-top:2px solid #E5E7EB; z-index:50; }
+    .tab-bar button { flex:1; padding:14px 0 10px; text-align:center; border:none; background:none;
+                      font-size:13px; font-weight:600; color:#9CA3AF; cursor:pointer; }
+    .tab-bar button.active { color:#07324C; border-top:3px solid #07324C; }
+
+    /* Hamburger menu */
+    .menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; }
+    .menu-panel { position:fixed; top:0; right:0; bottom:0; width:280px; background:white; z-index:101;
+                  box-shadow:-4px 0 20px rgba(0,0,0,.2); padding:24px; overflow-y:auto; }
+    .menu-item { padding:16px 0; border-bottom:1px solid #E5E7EB; font-size:18px; color:#07324C;
+                 cursor:pointer; font-weight:500; }
+    .menu-item:active { color:#ED1C24; }
+
+    /* Scrollable content area */
+    .content-scroll { padding-bottom:170px; overflow-y:auto; }
+
+    /* Stage pipeline */
+    .pipeline-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .pipeline-step { flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .pipeline-circle { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+                        font-size:13px; font-weight:700; border:2.5px solid; flex-shrink:0; }
+    .pipeline-line { height:2.5px; flex:1; min-width:14px; margin-top:-18px; z-index:0; }
+
+    /* Offline banner */
+    .offline-banner { position:sticky; top:0; z-index:80; background:#DC2626; color:white; text-align:center;
+                       padding:8px 16px; font-weight:700; font-size:15px; }
+
+    /* Fatigue banner */
+    .fatigue-warning { background:#F59E0B; color:white; padding:10px 16px; text-align:center; font-weight:700; font-size:15px; }
+    .fatigue-critical { background:#DC2626; color:white; padding:10px 16px; text-align:center; font-weight:700; font-size:15px; }
+
+    /* Odometer input */
+    .odometer-input { font-size:48px; font-weight:700; text-align:center; width:100%; border:none; border-bottom:3px solid #07324C;
+                       color:#07324C; background:transparent; outline:none; padding:8px 0; }
+    .odometer-input::placeholder { color:#D1D5DB; }
+
+    /* Photo modal */
+    .photo-preview { width:100%; max-height:280px; object-fit:cover; border-radius:12px; }
+
+    /* Modal backdrop */
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:flex; align-items:flex-end; }
+    .modal-sheet { background:white; border-radius:24px 24px 0 0; padding:28px 20px 40px; width:100%; max-height:92vh; overflow-y:auto; }
+    .modal-center { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .modal-card { background:white; border-radius:20px; padding:28px 20px; width:100%; max-width:460px; max-height:92vh; overflow-y:auto; }
+
+    /* Fatigue blocker */
+    .fatigue-blocker { position:fixed; inset:0; background:#07324C; z-index:500; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toast-container" class="toast-container"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ═══════════════════════════════════════════════════════════════
+// API & HELPERS
+// ═══════════════════════════════════════════════════════════════
+const API = "/api";
+const api = async (path, options = {}, token = null) => {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  let url = `${API}${path}`;
+  if (token && !headers["Authorization"]) {
+    url += (url.includes("?") ? "&" : "?") + `_token=${encodeURIComponent(token)}`;
+  }
+  const res = await fetch(url, { ...options, headers });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { error: text }; }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+};
+
+const toast = (msg, type = "info") => {
+  const el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+};
+
+const fmtTime = (seconds) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+};
+
+const fmtMins = (mins) => {
+  if (!mins) return "—";
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
+
+const STAGE_LABELS = {
+  waiting_to_load: "Waiting to Load",
+  being_loaded: "Being Loaded",
+  tie_down: "Tie Down",
+  driving_to_customer: "Driving to Customer",
+  waiting_at_customer: "Waiting at Customer",
+  being_unloaded: "Being Unloaded",
+  driving_return: "Driving Return",
+  break: "On Break",
+  being_loaded_at_customer: "Being Loaded (Customer)",
+  being_unloaded_at_depot: "Being Unloaded (Depot)",
+};
+
+const STAGE_TYPE = (stage) => {
+  if (stage === "break") return "break";
+  if (stage?.includes("waiting")) return "waiting";
+  if (stage?.includes("loaded") || stage?.includes("loading") || stage?.includes("unload") || stage === "tie_down") return "loading";
+  if (stage?.includes("driving")) return "driving";
+  return "waiting";
+};
+
+const STAGE_COLOR_CLASS = (stage) => {
+  const t = STAGE_TYPE(stage);
+  return { waiting: "stage-waiting", loading: "stage-loading", driving: "stage-driving", break: "stage-break" }[t] || "stage-waiting";
+};
+
+const STAGE_BAR_CLASS = (stage) => {
+  const t = STAGE_TYPE(stage);
+  return { waiting: "stage-bar-waiting", loading: "stage-bar-loading", driving: "stage-bar-driving", break: "stage-bar-break" }[t] || "stage-bar-waiting";
+};
+
+const STAGE_BG = (stage) => {
+  const t = STAGE_TYPE(stage);
+  return { waiting: "#F59E0B", loading: "#3B82F6", driving: "#10B981", break: "#6B7280" }[t] || "#F59E0B";
+};
+
+// Delivery stage pipelines
+const DELIVERY_STAGES = [
+  "waiting_to_load", "being_loaded", "tie_down",
+  "driving_to_customer", "waiting_at_customer", "being_unloaded", "driving_return"
+];
+const COLLECTION_STAGES = [
+  "driving_to_customer", "waiting_at_customer", "being_loaded_at_customer",
+  "tie_down", "driving_return", "being_unloaded_at_depot"
+];
+
+// Enhanced getLocation — also captures accuracy
+const getLocation = () => new Promise((resolve) => {
+  if (!navigator.geolocation) return resolve({ lat: null, lng: null, accuracy: null });
+  navigator.geolocation.getCurrentPosition(
+    (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+    () => resolve({ lat: null, lng: null, accuracy: null }),
+    { timeout: 5000, enableHighAccuracy: false }
+  );
+});
+
+// UUID generator for offline queue
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Offline queue helpers
+const queueOfflineAction = (action) => {
+  const queue = JSON.parse(localStorage.getItem("offline_queue") || "[]");
+  queue.push({ id: generateUUID(), queued_at: new Date().toISOString(), ...action });
+  localStorage.setItem("offline_queue", JSON.stringify(queue));
+};
+
+const flushOfflineQueue = async (token) => {
+  const queue = JSON.parse(localStorage.getItem("offline_queue") || "[]");
+  if (queue.length === 0) return;
+  try {
+    await api("/driver/sync", { method: "POST", body: JSON.stringify({ actions: queue }) }, token);
+    localStorage.removeItem("offline_queue");
+    toast(`Synced ${queue.length} offline action${queue.length > 1 ? "s" : ""}`, "success");
+  } catch (e) {
+    console.warn("Offline sync failed:", e);
+  }
+};
+
+// Image resize helper for photo compression
+const resizeImage = (file, maxWidth = 800) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.75));
+    };
+    img.onerror = reject;
+    img.src = evt.target.result;
+  };
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PIN LOGIN SCREEN
+// ═══════════════════════════════════════════════════════════════
+const PinLogin = ({ onLogin }) => {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const addDigit = (d) => {
+    if (pin.length >= 6) return;
+    const newPin = pin + d;
+    setPin(newPin);
+    setError("");
+    if (newPin.length === 6) {
+      doLogin(newPin);
+    }
+  };
+
+  const doLogin = async (p) => {
+    setLoading(true);
+    try {
+      const data = await api("/driver/pin-login", {
+        method: "POST",
+        body: JSON.stringify({ pin: p }),
+      });
+      onLogin(data);
+    } catch (e) {
+      setError("Invalid PIN — try again");
+      setPin("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ background: "linear-gradient(180deg, #07324C 0%, #0A4A6E 100%)" }}>
+      <div className="mb-6 text-center">
+        <div className="inline-flex items-center gap-3 mb-2">
+          <div style={{ width:40, height:40, background:"#ED1C24", clipPath:"polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }} />
+          <span className="text-white text-3xl font-bold tracking-wide">HYNE PALLETS</span>
+        </div>
+        <p className="text-white/60 text-base">Express Pallets &amp; Crates — Narangba</p>
+        <p className="text-white/80 text-xl mt-4 font-semibold">Driver Login</p>
+      </div>
+
+      <div className="flex mb-8">
+        {[0,1,2,3,4,5].map(i => (
+          <div key={i} className={`pin-dot ${i < pin.length ? "filled" : ""}`}
+               style={{ borderColor: error ? "#ED1C24" : "white", background: i < pin.length ? "white" : "transparent" }} />
+        ))}
+      </div>
+
+      {error && <p className="text-red-400 mb-4 text-base font-medium">{error}</p>}
+      {loading && <p className="text-white/70 mb-4">Logging in...</p>}
+
+      <div className="grid grid-cols-3 gap-4">
+        {[1,2,3,4,5,6,7,8,9,null,0,"del"].map((k, i) => (
+          k === null ? <div key={i} /> :
+          k === "del" ? (
+            <button key={i} className="pin-key delete" style={{ borderColor:"#ED1C24", color:"#ED1C24", background:"rgba(255,255,255,.95)" }}
+                    onClick={() => { setPin(pin.slice(0,-1)); setError(""); }}>
+              &#9003;
+            </button>
+          ) : (
+            <button key={i} className="pin-key" style={{ background:"rgba(255,255,255,.95)" }}
+                    onClick={() => addDigit(String(k))}>
+              {k}
+            </button>
+          )
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SAFETY CHECKLIST — fetches dynamic items from API
+// ═══════════════════════════════════════════════════════════════
+const SafetyChecklist = ({ onConfirm, driverName }) => {
+  const [items, setItems] = useState([]);
+  const [checks, setChecks] = useState({});
+  const [loadingItems, setLoadingItems] = useState(true);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const data = await api("/driver/safety-checklist-items");
+        if (data && data.length > 0) {
+          setItems(data);
+        } else {
+          // Fallback static items
+          setItems([
+            { id: "walkaround", item_text: "Vehicle walkaround inspection complete" },
+            { id: "restraints", item_text: "Load restraint equipment checked" },
+            { id: "ppe", item_text: "PPE worn (hi-vis, steel caps)" },
+            { id: "fit", item_text: "Fit for duty (no fatigue, no impairment)" },
+            { id: "firstaid", item_text: "First aid kit present" },
+            { id: "fire", item_text: "Fire extinguisher present" },
+          ]);
+        }
+      } catch (e) {
+        // Use fallback if API fails
+        setItems([
+          { id: "walkaround", item_text: "Vehicle walkaround inspection complete" },
+          { id: "restraints", item_text: "Load restraint equipment checked" },
+          { id: "ppe", item_text: "PPE worn (hi-vis, steel caps)" },
+          { id: "fit", item_text: "Fit for duty (no fatigue, no impairment)" },
+          { id: "firstaid", item_text: "First aid kit present" },
+          { id: "fire", item_text: "Fire extinguisher present" },
+        ]);
+      } finally {
+        setLoadingItems(false);
+      }
+    };
+    fetchItems();
+  }, []);
+
+  const allChecked = items.length > 0 && items.every(item => checks[item.id]);
+
+  const handleConfirm = () => {
+    const checklist = items.map(item => ({
+      item_id: item.id,
+      item_text: item.item_text,
+      checked: !!checks[item.id],
+    }));
+    onConfirm(checklist);
+  };
+
+  if (loadingItems) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-navy border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading checklist...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-white">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h2 className="text-2xl font-bold text-navy">Pre-Trip Safety Check</h2>
+          <p className="text-gray-500 mt-1">G'day {driverName} — tick all items before starting</p>
+        </div>
+
+        <div className="space-y-3 mb-8">
+          {items.map(item => (
+            <label key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl cursor-pointer"
+                   style={{ border: checks[item.id] ? "2px solid #07324C" : "2px solid transparent" }}>
+              <input type="checkbox" className="safety-check" checked={!!checks[item.id]}
+                     onChange={(e) => setChecks({ ...checks, [item.id]: e.target.checked })} />
+              <span className="text-lg" style={{ color: checks[item.id] ? "#07324C" : "#6B7280" }}>{item.item_text}</span>
+            </label>
+          ))}
+        </div>
+
+        <button onClick={handleConfirm} disabled={!allChecked}
+                className="w-full py-5 rounded-2xl text-xl font-bold text-white transition-all"
+                style={{ background: allChecked ? "#07324C" : "#D1D5DB", boxShadow: allChecked ? "0 4px 16px rgba(7,50,76,.3)" : "none" }}>
+          Confirm &amp; Continue
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ODOMETER ENTRY — NEW
+// ═══════════════════════════════════════════════════════════════
+const OdometerEntry = ({ onConfirm }) => {
+  const [value, setValue] = useState("");
+  const [skipped, setSkipped] = useState(false);
+
+  const handleSubmit = () => {
+    const num = value ? parseInt(value.replace(/\D/g, ""), 10) : null;
+    onConfirm(num);
+  };
+
+  const handleSkip = () => {
+    onConfirm(null);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-white">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
+            <span className="text-3xl">🚛</span>
+          </div>
+          <h2 className="text-2xl font-bold text-navy">Enter Starting Odometer</h2>
+          <p className="text-gray-500 mt-1">Record the odometer reading before your shift</p>
+        </div>
+
+        <div className="mb-3 text-center">
+          <input
+            type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="odometer-input"
+            placeholder="000000"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoFocus
+          />
+          <p className="text-gray-400 text-sm mt-2">km</p>
+        </div>
+
+        <button
+          onClick={handleSubmit}
+          disabled={!value}
+          className="w-full py-5 rounded-2xl text-xl font-bold text-white mb-4 transition-all"
+          style={{ background: value ? "#07324C" : "#D1D5DB", boxShadow: value ? "0 4px 16px rgba(7,50,76,.3)" : "none" }}>
+          Confirm Odometer
+        </button>
+
+        <button
+          onClick={handleSkip}
+          className="w-full py-4 rounded-2xl text-lg font-semibold text-gray-500 border-2 border-gray-200 bg-white transition-all">
+          I don't have odometer access
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TRUCK SELECT
+// ═══════════════════════════════════════════════════════════════
+const TruckSelect = ({ trucks, defaultTruck, onSelect, loading }) => {
+  const [selected, setSelected] = useState(defaultTruck?.id || null);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-white">
+      <div className="w-full max-w-md">
+        <h2 className="text-2xl font-bold text-navy text-center mb-2">Select Your Truck</h2>
+        <p className="text-gray-500 text-center mb-6">Which truck are you driving today?</p>
+
+        <div className="space-y-3 mb-8">
+          {trucks.map(t => (
+            <button key={t.id} onClick={() => setSelected(t.id)}
+                    className="w-full p-5 rounded-xl text-left transition-all flex items-center gap-4"
+                    style={{ border: selected === t.id ? "3px solid #07324C" : "2px solid #E5E7EB",
+                             background: selected === t.id ? "#F0F7FF" : "white" }}>
+              <div className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl"
+                   style={{ background: selected === t.id ? "#07324C" : "#E5E7EB",
+                            color: selected === t.id ? "white" : "#6B7280" }}>
+                {t.id}
+              </div>
+              <div>
+                <div className="text-lg font-bold" style={{ color: "#07324C" }}>{t.name}</div>
+                <div className="text-base text-gray-500">{t.rego} — {t.driver_name}</div>
+              </div>
+              {selected === t.id && <span className="ml-auto text-2xl" style={{ color: "#07324C" }}>✓</span>}
+            </button>
+          ))}
+        </div>
+
+        <button onClick={() => onSelect(selected)} disabled={!selected || loading}
+                className="w-full py-5 rounded-2xl text-xl font-bold text-white"
+                style={{ background: selected ? "#07324C" : "#D1D5DB" }}>
+          {loading ? "Starting Shift..." : "Start Shift"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE PIPELINE — NEW horizontal step indicator
+// ═══════════════════════════════════════════════════════════════
+const StagePipeline = ({ stages, currentStage, completedStages }) => {
+  if (!stages || stages.length === 0) return null;
+
+  const currentIdx = currentStage ? stages.indexOf(currentStage) : -1;
+
+  return (
+    <div className="bg-white px-3 py-3 border-b border-gray-100">
+      <div className="pipeline-scroll">
+        <div className="flex items-center" style={{ paddingBottom: 2, minWidth: stages.length * 72 }}>
+          {stages.map((stage, i) => {
+            const isDone = completedStages ? completedStages.includes(stage) : (currentIdx > i);
+            const isActive = stage === currentStage;
+            const isUpcoming = !isDone && !isActive;
+
+            let circleStyle, circleTextStyle, lineStyle;
+            if (isDone) {
+              circleStyle = { background: "#059669", borderColor: "#059669" };
+              circleTextStyle = { color: "white" };
+            } else if (isActive) {
+              circleStyle = { background: STAGE_BG(stage), borderColor: STAGE_BG(stage) };
+              circleTextStyle = { color: "white" };
+            } else {
+              circleStyle = { background: "white", borderColor: "#D1D5DB" };
+              circleTextStyle = { color: "#9CA3AF" };
+            }
+            lineStyle = { background: isDone ? "#059669" : "#E5E7EB" };
+
+            const shortLabels = {
+              waiting_to_load: "Wait",
+              being_loaded: "Load",
+              tie_down: "Tie",
+              driving_to_customer: "Drive",
+              waiting_at_customer: "Wait@",
+              being_unloaded: "Unload",
+              driving_return: "Return",
+              being_loaded_at_customer: "Load@",
+              being_unloaded_at_depot: "Depot",
+            };
+
+            return (
+              <React.Fragment key={stage}>
+                <div className="pipeline-step" style={{ minWidth: 56 }}>
+                  <div className="pipeline-circle" style={circleStyle}>
+                    <span style={circleTextStyle}>
+                      {isDone ? "✓" : String(i + 1)}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 10, color: isActive ? STAGE_BG(stage) : (isDone ? "#059669" : "#9CA3AF"),
+                                  fontWeight: isActive ? 700 : 500, textAlign: "center", lineHeight: 1.2,
+                                  whiteSpace: "nowrap", marginTop: 2 }}>
+                    {shortLabels[stage] || stage}
+                  </span>
+                </div>
+                {i < stages.length - 1 && (
+                  <div className="pipeline-line" style={lineStyle} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TIMER DISPLAY — full-width bar with pulsing dot
+// ═══════════════════════════════════════════════════════════════
+const TimerDisplay = ({ stage, startedAt, isBreak }) => {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!startedAt) { setElapsed(0); return; }
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const stageLabel = isBreak ? "On Break" : (STAGE_LABELS[stage] || stage || "Ready");
+  const bg = isBreak ? "#6B7280" : STAGE_BG(stage);
+
+  return (
+    <div className="w-full px-4 py-5 text-center text-white" style={{ background: bg }}>
+      <div className="flex items-center justify-center gap-3 mb-2">
+        {startedAt && <div className="pulse-dot" style={{ background: "white" }} />}
+        <span className="text-lg font-semibold uppercase tracking-wider">{stageLabel}</span>
+      </div>
+      <div className="text-5xl font-mono font-bold tracking-wider">
+        {startedAt ? fmtTime(elapsed) : "--:--"}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVERY CARD
+// ═══════════════════════════════════════════════════════════════
+const DeliveryCard = ({ delivery, isActive, onTap }) => {
+  const status = delivery.status || "pending";
+  const type = delivery.delivery_type || delivery.order_delivery_type || "delivery";
+
+  return (
+    <div onClick={onTap}
+         className={`bg-white rounded-xl shadow-sm mb-3 p-4 card-${status} cursor-pointer transition-all`}
+         style={{ opacity: status === "delivered" || status === "collected" ? 0.6 : 1,
+                  border: isActive ? "2px solid #07324C" : "1px solid #E5E7EB" }}>
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <div className="text-lg font-bold text-navy">{delivery.client_name || "Unknown Client"}</div>
+          <div className="text-base text-gray-500">
+            {delivery.street_address && `${delivery.street_address}, `}
+            {delivery.suburb || ""} {delivery.postcode || ""}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className="px-3 py-1 rounded-full text-xs font-bold text-white"
+                style={{ background: type === "collection" ? "#8B5CF6" : "#07324C" }}>
+            {type === "collection" ? "COLLECT" : "DELIVER"}
+          </span>
+          <span className="px-2 py-0.5 rounded text-xs font-semibold"
+                style={{ background: status === "delivered" ? "#D1FAE5" : status === "loaded" ? "#DBEAFE" : status === "in_transit" ? "#D1FAE5" : "#F3F4F6",
+                         color: status === "delivered" ? "#065F46" : status === "loaded" ? "#1E40AF" : status === "in_transit" ? "#065F46" : "#6B7280" }}>
+            {status.toUpperCase().replace(/_/g, " ")}
+          </span>
+        </div>
+      </div>
+
+      <div className="text-base text-gray-700 mb-1">
+        <span className="font-semibold">Order:</span> {delivery.order_number || "—"}
+      </div>
+
+      {delivery.items && delivery.items.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {delivery.items.map((item, i) => (
+            <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+              <span className="font-mono font-semibold text-navy">{item.sku_code || item.product_name}</span>
+              <span className="font-bold">{item.quantity} units</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+        <span className="text-base text-gray-500">{delivery.total_qty || 0} total units</span>
+        <span className="text-base font-semibold text-navy">
+          ~{delivery.estimated_travel_minutes || delivery.estimated_minutes || 30} min
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE HISTORY — with odometer data display
+// ═══════════════════════════════════════════════════════════════
+const StageHistory = ({ stages }) => {
+  if (!stages || stages.length === 0) return null;
+  return (
+    <div className="px-4 mb-4">
+      <h3 className="text-base font-bold text-gray-500 uppercase tracking-wider mb-2">Stage History</h3>
+      <div className="space-y-1">
+        {stages.map((s, i) => (
+          <div key={i} className={`flex items-center justify-between bg-white rounded-lg px-4 py-3 ${STAGE_BAR_CLASS(s.stage)}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{s.ended_at ? "✓" : "●"}</span>
+              <div>
+                <span className="text-base font-medium">{STAGE_LABELS[s.stage] || s.stage}</span>
+                {(s.odometer_start || s.odometer_end) && (
+                  <div className="text-xs text-gray-400">
+                    {s.odometer_start && `Odo start: ${s.odometer_start.toLocaleString()}`}
+                    {s.odometer_start && s.odometer_end && " → "}
+                    {s.odometer_end && `${s.odometer_end.toLocaleString()}`}
+                    {s.odometer_start && s.odometer_end && ` (${(s.odometer_end - s.odometer_start).toLocaleString()} km)`}
+                  </div>
+                )}
+              </div>
+            </div>
+            <span className="text-base font-mono font-semibold text-gray-600">
+              {s.duration_minutes ? fmtMins(s.duration_minutes) : (s.ended_at ? "—" : "active")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE COMPLETE PROMPT — NEW modal between stages
+// ═══════════════════════════════════════════════════════════════
+const StageCompletePrompt = ({ completedStage, completedDuration, nextStage, onStartNext, onBreak, onClose }) => {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-sheet">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3"
+               style={{ background: "#D1FAE5" }}>
+            <span className="text-3xl">✓</span>
+          </div>
+          <h2 className="text-2xl font-bold text-navy">Stage Complete!</h2>
+          <div className="mt-2 text-gray-600">
+            <span className="font-semibold">{STAGE_LABELS[completedStage] || completedStage}</span>
+            {completedDuration > 0 && (
+              <span className="ml-2 text-gray-400">({fmtMins(completedDuration)})</span>
+            )}
+          </div>
+        </div>
+
+        {nextStage && (
+          <button onClick={onStartNext}
+                  className="w-full py-5 rounded-2xl text-xl font-bold text-white mb-4"
+                  style={{ background: STAGE_BG(nextStage) }}>
+            Start: {STAGE_LABELS[nextStage] || nextStage}
+          </button>
+        )}
+
+        <button onClick={onBreak}
+                className="w-full py-4 rounded-2xl text-lg font-semibold text-white mb-3"
+                style={{ background: "#6B7280" }}>
+          ☕ Take a Break
+        </button>
+
+        {onClose && (
+          <button onClick={onClose}
+                  className="w-full py-4 rounded-2xl text-lg font-semibold text-gray-500 border-2 border-gray-200">
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MULTI-DROP PROMPT — NEW modal after delivery complete
+// ═══════════════════════════════════════════════════════════════
+const MultiDropPrompt = ({ nextDelivery, onNextStop, onReturnDepot }) => {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-sheet">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3"
+               style={{ background: "#DBEAFE" }}>
+            <span className="text-3xl">📦</span>
+          </div>
+          <h2 className="text-2xl font-bold text-navy">Delivery Complete!</h2>
+          {nextDelivery ? (
+            <p className="mt-2 text-gray-600">
+              Next stop: <span className="font-bold text-navy">{nextDelivery.client_name || "Unknown"}</span>
+            </p>
+          ) : (
+            <p className="mt-2 text-gray-600">All deliveries complete!</p>
+          )}
+        </div>
+
+        {nextDelivery ? (
+          <>
+            <button onClick={onNextStop}
+                    className="w-full py-5 rounded-2xl text-xl font-bold text-white mb-4"
+                    style={{ background: "#07324C" }}>
+              Go to Next Stop →
+            </button>
+            <button onClick={onReturnDepot}
+                    className="w-full py-4 rounded-2xl text-lg font-semibold text-gray-500 border-2 border-gray-200 bg-white">
+              Return to Depot
+            </button>
+          </>
+        ) : (
+          <button onClick={onReturnDepot}
+                  className="w-full py-5 rounded-2xl text-xl font-bold text-white"
+                  style={{ background: "#059669" }}>
+            Return to Depot ✓
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ODOMETER PROMPT — NEW modal for driving stage odometer capture
+// ═══════════════════════════════════════════════════════════════
+const OdometerPrompt = ({ title, onConfirm, onSkip }) => {
+  const [value, setValue] = useState("");
+  const [manualKm, setManualKm] = useState("");
+  const [mode, setMode] = useState("odometer"); // "odometer" | "manual"
+
+  const handleConfirm = () => {
+    if (mode === "odometer") {
+      const num = value ? parseInt(value.replace(/\D/g, ""), 10) : null;
+      onConfirm({ odometer: num, manual_km: null });
+    } else {
+      const km = manualKm ? parseFloat(manualKm) : null;
+      onConfirm({ odometer: null, manual_km: km });
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-sheet">
+        <h2 className="text-xl font-bold text-navy mb-5 text-center">{title || "Odometer Reading"}</h2>
+
+        <div className="flex gap-2 mb-5">
+          <button onClick={() => setMode("odometer")}
+                  className="flex-1 py-3 rounded-xl font-semibold text-base transition-all"
+                  style={{ background: mode === "odometer" ? "#07324C" : "#F3F4F6",
+                           color: mode === "odometer" ? "white" : "#6B7280" }}>
+            Odometer
+          </button>
+          <button onClick={() => setMode("manual")}
+                  className="flex-1 py-3 rounded-xl font-semibold text-base transition-all"
+                  style={{ background: mode === "manual" ? "#07324C" : "#F3F4F6",
+                           color: mode === "manual" ? "white" : "#6B7280" }}>
+            Enter km manually
+          </button>
+        </div>
+
+        {mode === "odometer" ? (
+          <div className="mb-5 text-center">
+            <input
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="odometer-input"
+              placeholder="000000"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              autoFocus
+            />
+            <p className="text-gray-400 text-sm mt-1">Enter current odometer reading (km)</p>
+          </div>
+        ) : (
+          <div className="mb-5 text-center">
+            <input
+              type="number"
+              inputMode="decimal"
+              className="odometer-input"
+              placeholder="0.0"
+              value={manualKm}
+              onChange={(e) => setManualKm(e.target.value)}
+              autoFocus
+            />
+            <p className="text-gray-400 text-sm mt-1">Distance in km for this leg</p>
+          </div>
+        )}
+
+        <button onClick={handleConfirm}
+                disabled={mode === "odometer" ? !value : !manualKm}
+                className="w-full py-5 rounded-2xl text-xl font-bold text-white mb-3 transition-all"
+                style={{ background: (mode === "odometer" ? value : manualKm) ? "#07324C" : "#D1D5DB" }}>
+          Confirm
+        </button>
+
+        <button onClick={() => onConfirm({ odometer: null, manual_km: null })}
+                className="w-full py-4 rounded-2xl text-lg text-gray-500 border-2 border-gray-200 bg-white">
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// PHOTO CAPTURE — NEW modal for POD photos
+// ═══════════════════════════════════════════════════════════════
+const PhotoCapture = ({ title, onConfirm, onSkip }) => {
+  const [preview, setPreview] = useState(null);
+  const [base64, setBase64] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const fileRef = useRef(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setProcessing(true);
+    try {
+      const data = await resizeImage(file, 800);
+      setBase64(data);
+      setPreview(data);
+    } catch (err) {
+      toast("Could not process photo", "error");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRetake = () => {
+    setPreview(null);
+    setBase64(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-sheet">
+        <h2 className="text-xl font-bold text-navy mb-2 text-center">{title || "Proof of Delivery"}</h2>
+        <p className="text-gray-500 text-base text-center mb-5">Take a photo to confirm delivery</p>
+
+        {preview ? (
+          <div className="mb-5">
+            <img src={preview} alt="Preview" className="photo-preview" />
+            <div className="flex gap-3 mt-4">
+              <button onClick={handleRetake}
+                      className="flex-1 py-4 rounded-xl font-semibold text-gray-600 border-2 border-gray-200 bg-white text-base">
+                Retake
+              </button>
+              <button onClick={() => onConfirm(base64)}
+                      className="flex-1 py-4 rounded-xl font-bold text-white text-base"
+                      style={{ background: "#059669" }}>
+                ✓ Use Photo
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-5">
+            <input ref={fileRef} type="file" accept="image/*" capture="environment"
+                   onChange={handleFile} style={{ display: "none" }} />
+            <button onClick={() => fileRef.current && fileRef.current.click()}
+                    disabled={processing}
+                    className="w-full py-6 rounded-2xl font-bold text-white text-xl mb-3"
+                    style={{ background: processing ? "#9CA3AF" : "#07324C" }}>
+              {processing ? "Processing..." : "📷 Take Photo"}
+            </button>
+          </div>
+        )}
+
+        <button onClick={onSkip}
+                className="w-full py-4 rounded-2xl text-lg text-gray-500 border-2 border-gray-200 bg-white">
+          Skip Photo
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// FATIGUE BLOCKER — NEW blocking overlay for mandatory breaks
+// ═══════════════════════════════════════════════════════════════
+const FatigueBlocker = ({ type, onBreak, onClockOff }) => {
+  const isMaxShift = type === "max_shift";
+
+  return (
+    <div className="fatigue-blocker">
+      <div className="text-center text-white">
+        <div className="text-6xl mb-6">🚨</div>
+        <h2 className="text-3xl font-black mb-4 uppercase tracking-wide">
+          {isMaxShift ? "Maximum Shift Reached" : "Mandatory Break Required"}
+        </h2>
+        <p className="text-white/80 text-lg mb-8">
+          {isMaxShift
+            ? "You have reached the maximum shift duration. You must clock off now."
+            : "You must take a break before continuing. This is a legal requirement."}
+        </p>
+
+        {isMaxShift ? (
+          <button onClick={onClockOff}
+                  className="w-full py-6 rounded-2xl text-xl font-bold text-white"
+                  style={{ background: "#ED1C24", boxShadow: "0 4px 20px rgba(237,28,36,.4)" }}>
+            Clock Off Now
+          </button>
+        ) : (
+          <button onClick={onBreak}
+                  className="w-full py-6 rounded-2xl text-xl font-bold text-navy"
+                  style={{ background: "white", boxShadow: "0 4px 20px rgba(0,0,0,.2)" }}>
+            ☕ Start Mandatory Break
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// COST BREAKDOWN MODAL — NEW
+// ═══════════════════════════════════════════════════════════════
+const CostBreakdownModal = ({ costs, title, onClose }) => {
+  if (!costs) return null;
+
+  const rows = [
+    { label: "Driver Wages", key: "driver_cost" },
+    { label: "Fuel", key: "fuel_cost" },
+    { label: "Rego", key: "rego_cost" },
+    { label: "Insurance", key: "insurance_cost" },
+    { label: "R&M", key: "rm_cost" },
+    { label: "Tyres", key: "tyre_cost" },
+    { label: "Tolls", key: "toll_cost" },
+  ];
+
+  return (
+    <div className="modal-center">
+      <div className="modal-card">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold text-navy">{title || "Cost Breakdown"}</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl w-10 h-10 flex items-center justify-center">&times;</button>
+        </div>
+
+        <div className="space-y-2 mb-4">
+          {rows.map(row => (
+            costs[row.key] != null && costs[row.key] > 0 ? (
+              <div key={row.key} className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-600">{row.label}</span>
+                <span className="font-semibold text-navy">${(costs[row.key] || 0).toFixed(2)}</span>
+              </div>
+            ) : null
+          ))}
+        </div>
+
+        <div className="flex justify-between py-3 border-t-2 border-navy mt-2">
+          <span className="font-bold text-navy text-lg">Total</span>
+          <span className="font-bold text-navy text-xl">${(costs.total_cost || 0).toFixed(2)}</span>
+        </div>
+
+        {costs.cost_per_pallet != null && (
+          <div className="mt-3 bg-blue-50 rounded-xl p-3 text-center">
+            <span className="text-blue-700 font-semibold">Cost per pallet: </span>
+            <span className="text-blue-900 font-bold text-lg">${(costs.cost_per_pallet || 0).toFixed(2)}</span>
+          </div>
+        )}
+
+        {costs.total_km != null && (
+          <div className="mt-2 text-center text-gray-500 text-sm">
+            Total distance: {costs.total_km.toFixed(1)} km
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// LOGBOOK TAB — NEW
+// ═══════════════════════════════════════════════════════════════
+const LOGBOOK_EVENT_TYPES = [
+  { value: "depart_depot", label: "Depart Depot" },
+  { value: "arrive_customer", label: "Arrive Customer" },
+  { value: "depart_customer", label: "Depart Customer" },
+  { value: "return_depot", label: "Return to Depot" },
+  { value: "fuel_stop", label: "Fuel Stop" },
+  { value: "rest_break", label: "Rest Break" },
+  { value: "inspection", label: "Inspection" },
+  { value: "other", label: "Other" },
+];
+
+const LOGBOOK_ICONS = {
+  depart_depot: "🏭",
+  arrive_customer: "📍",
+  depart_customer: "🚛",
+  return_depot: "🏠",
+  fuel_stop: "⛽",
+  rest_break: "☕",
+  inspection: "🔍",
+  other: "📝",
+};
+
+const LogbookTab = ({ shift, token }) => {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [eventType, setEventType] = useState("other");
+  const [odometer, setOdometer] = useState("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadEntries = async () => {
+    try {
+      const data = await api(`/driver/logbook?shift_id=${shift.id}`, {}, token);
+      setEntries(data || []);
+    } catch (e) {
+      console.error("Logbook load error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadEntries(); }, [shift.id]);
+
+  const handleAddEntry = async () => {
+    setSubmitting(true);
+    try {
+      const loc = await getLocation();
+      await api("/driver/logbook", {
+        method: "POST",
+        body: JSON.stringify({
+          shift_id: shift.id,
+          event_type: eventType,
+          odometer_reading: odometer ? parseInt(odometer, 10) : null,
+          lat: loc.lat,
+          lng: loc.lng,
+          notes: notes.trim() || null,
+        }),
+      }, token);
+      toast("Logbook entry added", "success");
+      setShowForm(false);
+      setOdometer("");
+      setNotes("");
+      setEventType("other");
+      loadEntries();
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const fmtDateTime = (dt) => {
+    if (!dt) return "—";
+    return new Date(dt).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="px-4 pb-4">
+      <div className="flex items-center justify-between mb-4 pt-3">
+        <h3 className="text-lg font-bold text-navy">Logbook</h3>
+        <button onClick={() => setShowForm(true)}
+                className="px-4 py-2 rounded-xl font-semibold text-white text-base"
+                style={{ background: "#07324C" }}>
+          + Add Entry
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-gray-400">Loading...</div>
+      ) : entries.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-4xl mb-3">📓</div>
+          <p className="text-gray-500">No logbook entries yet</p>
+          <p className="text-gray-400 text-sm mt-1">Tap "Add Entry" to record an event</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((entry, i) => (
+            <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">{LOGBOOK_ICONS[entry.event_type] || "📝"}</span>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-navy text-base">
+                      {LOGBOOK_EVENT_TYPES.find(t => t.value === entry.event_type)?.label || entry.event_type}
+                    </span>
+                    <span className="text-gray-400 text-sm font-mono">{fmtDateTime(entry.created_at)}</span>
+                  </div>
+                  {entry.odometer_reading && (
+                    <div className="text-sm text-gray-500 mt-1">Odo: {entry.odometer_reading.toLocaleString()} km</div>
+                  )}
+                  {entry.manual_km && (
+                    <div className="text-sm text-gray-500 mt-1">Distance: {entry.manual_km} km</div>
+                  )}
+                  {entry.notes && (
+                    <div className="text-sm text-gray-700 mt-1">{entry.notes}</div>
+                  )}
+                  {entry.location_description && (
+                    <div className="text-xs text-gray-400 mt-1">📍 {entry.location_description}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add entry form modal */}
+      {showForm && (
+        <div className="modal-backdrop">
+          <div className="modal-sheet">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-xl font-bold text-navy">Add Logbook Entry</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 text-3xl">&times;</button>
+            </div>
+
+            <label className="block font-semibold text-navy mb-2">Event Type</label>
+            <select value={eventType} onChange={e => setEventType(e.target.value)}
+                    className="w-full p-4 rounded-xl border-2 border-gray-200 text-lg text-navy mb-4"
+                    style={{ background: "white" }}>
+              {LOGBOOK_EVENT_TYPES.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+
+            <label className="block font-semibold text-navy mb-2">Odometer (optional)</label>
+            <input type="number" inputMode="numeric" placeholder="km reading"
+                   value={odometer} onChange={e => setOdometer(e.target.value)}
+                   className="w-full p-4 rounded-xl border-2 border-gray-200 text-lg text-navy mb-4" />
+
+            <label className="block font-semibold text-navy mb-2">Notes (optional)</label>
+            <textarea rows={3} placeholder="Any notes..."
+                      value={notes} onChange={e => setNotes(e.target.value)}
+                      className="w-full p-4 rounded-xl border-2 border-gray-200 text-lg text-navy mb-5"
+                      style={{ resize: "vertical" }} />
+
+            <button onClick={handleAddEntry} disabled={submitting}
+                    className="w-full py-5 rounded-2xl text-xl font-bold text-white"
+                    style={{ background: "#07324C" }}>
+              {submitting ? "Saving..." : "Save Entry"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// GPS STATUS MODAL — NEW
+// ═══════════════════════════════════════════════════════════════
+const GPSStatusModal = ({ shift, token, onClose }) => {
+  const [position, setPosition] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPosition = async () => {
+      try {
+        const data = await api(`/trackmyride/position?truck_id=${shift.truck_id}`, {}, token);
+        setPosition(data);
+      } catch (e) {
+        setPosition(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPosition();
+  }, [shift.truck_id]);
+
+  const fmtDateTime = (dt) => {
+    if (!dt) return "—";
+    return new Date(dt).toLocaleString("en-AU");
+  };
+
+  return (
+    <div className="modal-center">
+      <div className="modal-card">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold text-navy">GPS Status</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl w-10 h-10 flex items-center justify-center">&times;</button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin w-10 h-10 border-4 border-navy border-t-transparent rounded-full mx-auto"></div>
+          </div>
+        ) : position && position.lat ? (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-green-500 pulse-dot"></div>
+              <span className="font-bold text-green-700">TrackMyRide — Connected</span>
+            </div>
+            <div className="space-y-3">
+              <div className="bg-gray-50 rounded-xl p-4">
+                <div className="text-sm text-gray-500">Location</div>
+                <div className="font-mono font-semibold text-navy">{position.lat?.toFixed(5)}, {position.lng?.toFixed(5)}</div>
+              </div>
+              {position.speed != null && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="text-sm text-gray-500">Speed</div>
+                  <div className="font-bold text-navy text-xl">{Math.round(position.speed)} km/h</div>
+                </div>
+              )}
+              {position.last_update && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="text-sm text-gray-500">Last Update</div>
+                  <div className="text-navy">{fmtDateTime(position.last_update)}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <div className="text-4xl mb-3">📍</div>
+            <p className="font-bold text-navy mb-2">Manual Logbook Mode</p>
+            <p className="text-gray-500 text-base">TrackMyRide not connected. GPS tracking unavailable. Use the Logbook tab to record your movements.</p>
+          </div>
+        )}
+
+        <button onClick={onClose}
+                className="w-full mt-5 py-4 rounded-2xl font-bold text-white"
+                style={{ background: "#07324C" }}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SHIFT SUMMARY — UPGRADED with costs and odometer
+// ═══════════════════════════════════════════════════════════════
+const ShiftSummary = ({ shift, stages, costs, onClose }) => {
+  const [shiftCostBreakdown, setShiftCostBreakdown] = useState(null);
+  const [loadingCosts, setLoadingCosts] = useState(false);
+
+  useEffect(() => {
+    if (shift?.id) {
+      setLoadingCosts(true);
+      api(`/driver/cost-breakdown?shift_id=${shift.id}`, {}, null)
+        .then(data => setShiftCostBreakdown(data))
+        .catch(() => {})
+        .finally(() => setLoadingCosts(false));
+    }
+  }, [shift?.id]);
+
+  const totalDriving = stages.filter(s => s.stage?.includes("driving")).reduce((a, s) => a + (s.duration_minutes || 0), 0);
+  const totalWaiting = stages.filter(s => s.stage?.includes("waiting")).reduce((a, s) => a + (s.duration_minutes || 0), 0);
+  const totalLoading = stages.filter(s => s.stage?.includes("load") || s.stage === "tie_down" || s.stage?.includes("unload")).reduce((a, s) => a + (s.duration_minutes || 0), 0);
+  const totalBreak = stages.filter(s => s.stage === "break").reduce((a, s) => a + (s.duration_minutes || 0), 0);
+
+  const odometerStart = shift?.odometer_start;
+  const odometerEnd = shift?.odometer_end;
+  const kmDriven = odometerStart && odometerEnd ? odometerEnd - odometerStart : null;
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+      <div className="p-6 max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-navy">Shift Summary</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl w-10 h-10 flex items-center justify-center">&times;</button>
+        </div>
+
+        <div className="bg-navy text-white rounded-xl p-5 mb-4">
+          <div className="text-white/70 text-sm">Total Shift Duration</div>
+          <div className="text-3xl font-bold">{shift?.total_hours ? `${shift.total_hours.toFixed(1)} hrs` : "—"}</div>
+          {kmDriven != null && (
+            <div className="text-white/80 mt-1 text-sm">Total distance: {kmDriven.toLocaleString()} km</div>
+          )}
+        </div>
+
+        {(odometerStart || odometerEnd) && (
+          <div className="bg-blue-50 rounded-xl p-4 mb-4">
+            <div className="text-sm font-semibold text-blue-700 mb-2">Odometer</div>
+            <div className="flex justify-between">
+              {odometerStart && <div><div className="text-xs text-blue-500">Start</div><div className="font-bold text-blue-900">{odometerStart.toLocaleString()} km</div></div>}
+              {odometerEnd && <div className="text-right"><div className="text-xs text-blue-500">End</div><div className="font-bold text-blue-900">{odometerEnd.toLocaleString()} km</div></div>}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-green-50 rounded-xl p-4">
+            <div className="text-sm text-green-600">Driving</div>
+            <div className="text-xl font-bold text-green-800">{fmtMins(totalDriving)}</div>
+          </div>
+          <div className="bg-blue-50 rounded-xl p-4">
+            <div className="text-sm text-blue-600">Loading/Unloading</div>
+            <div className="text-xl font-bold text-blue-800">{fmtMins(totalLoading)}</div>
+          </div>
+          <div className="bg-amber-50 rounded-xl p-4">
+            <div className="text-sm text-amber-600">Waiting</div>
+            <div className="text-xl font-bold text-amber-800">{fmtMins(totalWaiting)}</div>
+          </div>
+          <div className="bg-gray-100 rounded-xl p-4">
+            <div className="text-sm text-gray-500">Breaks</div>
+            <div className="text-xl font-bold text-gray-700">{fmtMins(totalBreak)}</div>
+          </div>
+        </div>
+
+        {/* Cost breakdown from API */}
+        {loadingCosts ? (
+          <div className="text-center py-4 text-gray-400">Loading costs...</div>
+        ) : shiftCostBreakdown ? (
+          <div className="mb-6">
+            <h3 className="text-lg font-bold text-navy mb-3">Shift Costs</h3>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              {[
+                { label: "Driver Wages", key: "driver_cost" },
+                { label: "Fuel", key: "fuel_cost" },
+                { label: "Rego", key: "rego_cost" },
+                { label: "Insurance", key: "insurance_cost" },
+                { label: "R&M", key: "rm_cost" },
+                { label: "Tyres", key: "tyre_cost" },
+                { label: "Tolls", key: "toll_cost" },
+              ].map(row => (
+                shiftCostBreakdown[row.key] > 0 ? (
+                  <div key={row.key} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                    <span className="text-gray-600">{row.label}</span>
+                    <span className="font-semibold">${(shiftCostBreakdown[row.key] || 0).toFixed(2)}</span>
+                  </div>
+                ) : null
+              ))}
+              <div className="flex justify-between pt-3 mt-2 border-t-2 border-navy">
+                <span className="font-bold text-navy">Total</span>
+                <span className="font-bold text-navy text-lg">${(shiftCostBreakdown.total_cost || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        ) : costs && costs.length > 0 ? (
+          <div className="mb-6">
+            <h3 className="text-lg font-bold text-navy mb-3">Run Costs</h3>
+            {costs.map((c, i) => (
+              <div key={i} className="bg-white rounded-xl border p-4 mb-2">
+                <div className="flex justify-between mb-1"><span className="text-gray-600">Driver</span><span className="font-semibold">${(c.driver_cost || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between mb-1"><span className="text-gray-600">Fuel</span><span className="font-semibold">${(c.fuel_cost || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between mb-1"><span className="text-gray-600">Rego + Ins</span><span className="font-semibold">${((c.rego_cost || 0) + (c.insurance_cost || 0)).toFixed(2)}</span></div>
+                <div className="flex justify-between mb-1"><span className="text-gray-600">R&M + Tyres</span><span className="font-semibold">${((c.rm_cost || 0) + (c.tyre_cost || 0)).toFixed(2)}</span></div>
+                <div className="flex justify-between pt-2 border-t border-gray-200 mt-2">
+                  <span className="font-bold text-navy">Total</span>
+                  <span className="font-bold text-navy text-lg">${(c.total_cost || 0).toFixed(2)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        <StageHistory stages={stages} />
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// RUN SHEET VIEW — keep existing
+// ═══════════════════════════════════════════════════════════════
+const RunSheetView = ({ shift, token, onClose }) => {
+  const [runSheet, setRunSheet] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const data = await api(`/driver/runsheet?truck_id=${shift.truck_id}&date=${today}`, {}, token);
+        setRunSheet(data);
+      } catch (e) {
+        console.error("Run sheet error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [shift, token]);
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div className="animate-spin w-12 h-12 border-4 border-navy border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  const stops = runSheet?.stops || [];
+  const totalMins = runSheet?.total_estimated_minutes || 0;
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+      <div className="p-4 max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-navy">Run Sheet</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl w-10 h-10 flex items-center justify-center">&times;</button>
+        </div>
+
+        <div className="bg-navy text-white rounded-xl p-4 mb-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-white/60 text-sm">Truck</div>
+              <div className="text-xl font-bold">{shift.truck_name || `Truck ${shift.truck_id}`}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-white/60 text-sm">Total Stops</div>
+              <div className="text-xl font-bold">{stops.length}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-white/60 text-sm">Est. Duration</div>
+              <div className="text-xl font-bold">{fmtMins(totalMins)}</div>
+            </div>
+          </div>
+        </div>
+
+        {stops.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">📋</div>
+            <p className="text-xl text-gray-500">No stops on today's run sheet</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {stops.map((stop, idx) => {
+              const type = stop.delivery_type || stop.order_delivery_type || "delivery";
+              const status = stop.status || "pending";
+              const isDone = status === "delivered" || status === "collected";
+              return (
+                <div key={stop.id || idx}
+                     className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${isDone ? "opacity-50" : ""}`}
+                     style={{ borderLeftColor: type === "collection" ? "#8B5CF6" : "#07324C" }}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg"
+                           style={{ background: isDone ? "#059669" : "#07324C" }}>
+                        {isDone ? "✓" : idx + 1}
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-navy">{stop.client_name || "Unknown"}</div>
+                        <div className="text-sm text-gray-500">
+                          {stop.street_address && `${stop.street_address}, `}
+                          {stop.suburb || ""} {stop.postcode || ""}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="px-2 py-1 rounded-full text-xs font-bold text-white"
+                          style={{ background: type === "collection" ? "#8B5CF6" : "#07324C" }}>
+                      {type === "collection" ? "COLLECT" : "DELIVER"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600 mt-2">
+                    <span>Order: <strong>{stop.order_number || "—"}</strong></span>
+                    <span>{stop.total_qty || 0} units</span>
+                    <span>~{fmtMins(stop.estimated_arrival_minutes || 0)} from depot</span>
+                  </div>
+                  {stop.items && stop.items.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {stop.items.map((item, i) => (
+                        <div key={i} className="flex justify-between text-sm bg-gray-50 rounded px-2 py-1">
+                          <span className="font-mono text-navy">{item.sku_code || item.product_name}</span>
+                          <span className="font-bold">{item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// INCIDENT REPORTING — UPGRADED with photo capture
+// ═══════════════════════════════════════════════════════════════
+const INCIDENT_TYPES = [
+  { value: "vehicle_damage", label: "Vehicle Damage" },
+  { value: "product_damage", label: "Product Damage" },
+  { value: "road_incident", label: "Road Incident" },
+  { value: "customer_issue", label: "Customer Issue" },
+  { value: "safety_concern", label: "Safety Concern" },
+  { value: "near_miss", label: "Near Miss" },
+  { value: "other", label: "Other" },
+];
+
+const IncidentReport = ({ shift, token, deliveries, onClose }) => {
+  const [incidentType, setIncidentType] = useState("");
+  const [description, setDescription] = useState("");
+  const [deliveryId, setDeliveryId] = useState("");
+  const [photoBase64, setPhotoBase64] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const fileRef = useRef(null);
+
+  const handlePhotoFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const data = await resizeImage(file, 800);
+      setPhotoBase64(data);
+      setPhotoPreview(data);
+    } catch (err) {
+      toast("Could not process photo", "error");
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!incidentType || !description.trim()) {
+      toast("Select type and add description", "error");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const loc = await getLocation();
+      await api("/driver/incident", {
+        method: "POST",
+        body: JSON.stringify({
+          shift_id: shift.id,
+          delivery_log_id: deliveryId || null,
+          incident_type: incidentType,
+          description: description.trim(),
+          photo_data: photoBase64 || null,
+          lat: loc.lat,
+          lng: loc.lng,
+        }),
+      }, token);
+      setSubmitted(true);
+      toast("Incident reported", "success");
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div className="text-center p-6">
+          <div className="text-6xl mb-4">✓</div>
+          <h2 className="text-2xl font-bold text-navy mb-2">Incident Reported</h2>
+          <p className="text-gray-500 mb-6">Management has been notified. Stay safe.</p>
+          <button onClick={onClose} className="px-8 py-4 rounded-xl text-white font-bold text-lg" style={{ background: "#07324C" }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+      <div className="p-4 max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-navy">Report Incident</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl w-10 h-10 flex items-center justify-center">&times;</button>
+        </div>
+
+        <label className="block text-base font-semibold text-navy mb-2">Incident Type *</label>
+        <div className="space-y-2 mb-5">
+          {INCIDENT_TYPES.map(t => (
+            <button key={t.value} onClick={() => setIncidentType(t.value)}
+                    className="w-full p-4 rounded-xl text-left text-lg font-medium transition-all"
+                    style={{ border: incidentType === t.value ? "3px solid #07324C" : "2px solid #E5E7EB",
+                             background: incidentType === t.value ? "#F0F7FF" : "white", color: "#07324C" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {deliveries && deliveries.length > 0 && (
+          <div className="mb-5">
+            <label className="block text-base font-semibold text-navy mb-2">Related Delivery (optional)</label>
+            <select value={deliveryId} onChange={e => setDeliveryId(e.target.value)}
+                    className="w-full p-4 rounded-xl border-2 border-gray-200 text-lg text-navy"
+                    style={{ background: "white" }}>
+              <option value="">— None —</option>
+              {deliveries.map(d => (
+                <option key={d.id} value={d.id}>{d.client_name || d.order_number || `Stop #${d.id}`}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <label className="block text-base font-semibold text-navy mb-2">Description *</label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)}
+                  rows={5} placeholder="Describe what happened..."
+                  className="w-full p-4 rounded-xl border-2 border-gray-200 text-lg text-navy mb-4"
+                  style={{ resize: "vertical", minHeight: "120px" }} />
+
+        {/* Photo attachment */}
+        <div className="mb-5">
+          <label className="block text-base font-semibold text-navy mb-2">Photo (optional)</label>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment"
+                 onChange={handlePhotoFile} style={{ display: "none" }} />
+          {photoPreview ? (
+            <div>
+              <img src={photoPreview} alt="Incident photo" className="photo-preview mb-2" />
+              <button onClick={() => { setPhotoBase64(null); setPhotoPreview(null); if (fileRef.current) fileRef.current.value = ""; }}
+                      className="text-sm text-red-500 underline">Remove photo</button>
+            </div>
+          ) : (
+            <button onClick={() => fileRef.current && fileRef.current.click()}
+                    className="w-full py-4 rounded-xl font-semibold text-navy border-2 border-gray-200 bg-white text-base">
+              📷 Add Photo
+            </button>
+          )}
+        </div>
+
+        <button onClick={handleSubmit} disabled={submitting || !incidentType || !description.trim()}
+                className="w-full py-5 rounded-2xl text-xl font-bold text-white transition-all"
+                style={{ background: (incidentType && description.trim()) ? "#ED1C24" : "#D1D5DB" }}>
+          {submitting ? "Submitting..." : "Submit Incident Report"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN DRIVER APP — MAJOR REWRITE with all Block 3 features
+// ═══════════════════════════════════════════════════════════════
+const DriverApp = ({ user, token, shift, onClockOff }) => {
+  const [tab, setTab] = useState("current");
+  const [deliveries, setDeliveries] = useState([]);
+  const [upcoming, setUpcoming] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeDeliveryIdx, setActiveDeliveryIdx] = useState(0);
+  const [currentStage, setCurrentStage] = useState(null);
+  const [currentStageId, setCurrentStageId] = useState(null);
+  const [stageStartedAt, setStageStartedAt] = useState(null);
+  const [allStages, setAllStages] = useState([]);
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [breakStageId, setBreakStageId] = useState(null);
+  const [breakStartedAt, setBreakStartedAt] = useState(null);
+  const [pausedStage, setPausedStage] = useState(null);
+  const [pausedStageId, setPausedStageId] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [showRunSheet, setShowRunSheet] = useState(false);
+  const [showIncident, setShowIncident] = useState(false);
+  const [showGPSStatus, setShowGPSStatus] = useState(false);
+  const [shiftCosts, setShiftCosts] = useState([]);
+  const [stopNumber, setStopNumber] = useState(1);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [offlineQueue, setOfflineQueue] = useState([]);
+
+  // Fatigue state
+  const [fatigueWarning, setFatigueWarning] = useState(null); // null | { level: 'warning'|'critical', message, type }
+  const [showFatigueBlocker, setShowFatigueBlocker] = useState(false);
+  const [fatigueBlockerType, setFatigueBlockerType] = useState(null); // 'break' | 'max_shift'
+
+  // Modal states
+  const [showStageComplete, setShowStageComplete] = useState(false);
+  const [stageCompleteData, setStageCompleteData] = useState(null); // { stage, duration, nextStage }
+  const [showMultiDrop, setShowMultiDrop] = useState(false);
+  const [multiDropNextDelivery, setMultiDropNextDelivery] = useState(null);
+  const [showOdometerPrompt, setShowOdometerPrompt] = useState(false);
+  const [odometerPromptTitle, setOdometerPromptTitle] = useState("");
+  const [odometerPromptResolve, setOdometerPromptResolve] = useState(null);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [photoCaptureTitle, setPhotoCaptureTitle] = useState("");
+  const [photoCaptureResolve, setPhotoCaptureResolve] = useState(null);
+  const [showCostBreakdown, setShowCostBreakdown] = useState(false);
+  const [costBreakdownData, setCostBreakdownData] = useState(null);
+
+  // Pending action for after modals
+  const pendingActionRef = useRef(null);
+  const odometerDataRef = useRef(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const data = await api(`/driver/load?truck_id=${shift.truck_id}&date=${today}`, {}, token);
+      setDeliveries(data || []);
+      const upcoming_data = await api(`/driver/upcoming?truck_id=${shift.truck_id}&date=${today}`, {}, token);
+      setUpcoming(upcoming_data || []);
+      const stageData = await api(`/driver/stages?shift_id=${shift.id}`, {}, token);
+      setAllStages(stageData || []);
+      // Restore active stage — find most recent open stage
+      const openStages = (stageData || []).filter(s => !s.ended_at);
+      const active = openStages.length > 0
+        ? openStages.reduce((latest, s) => !latest || s.started_at > latest.started_at ? s : latest, null)
+        : null;
+      if (active) {
+        if (active.stage === "break") {
+          setIsOnBreak(true);
+          setBreakStageId(active.id);
+          setBreakStartedAt(active.started_at);
+          setStageStartedAt(active.started_at);
+        } else {
+          setCurrentStage(active.stage);
+          setCurrentStageId(active.id);
+          setStageStartedAt(active.started_at);
+        }
+      }
+    } catch (e) {
+      console.error("Load error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [shift, token]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Online/offline detection + offline queue sync
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      flushOfflineQueue(token);
+      const q = JSON.parse(localStorage.getItem("offline_queue") || "[]");
+      setOfflineQueue(q);
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    // Init queue state
+    setOfflineQueue(JSON.parse(localStorage.getItem("offline_queue") || "[]"));
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [token]);
+
+  // Fatigue polling — every 5 minutes
+  useEffect(() => {
+    const checkFatigue = async () => {
+      try {
+        const data = await api(`/driver/fatigue-check?shift_id=${shift.id}`, {}, token);
+        if (data && data.level) {
+          setFatigueWarning(data);
+          if (data.level === "critical") {
+            if (data.type === "max_shift") {
+              setFatigueBlockerType("max_shift");
+              setShowFatigueBlocker(true);
+            } else {
+              setFatigueBlockerType("break");
+              setShowFatigueBlocker(true);
+            }
+          }
+        } else {
+          setFatigueWarning(null);
+        }
+      } catch (e) {
+        // Silently fail — don't block the driver on API failure
+      }
+    };
+    checkFatigue();
+    const interval = setInterval(checkFatigue, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [shift.id, token]);
+
+  // Active delivery and stage pipeline
+  const activeDelivery = deliveries.find(d => d.status !== "delivered" && d.status !== "collected") || deliveries[activeDeliveryIdx];
+  const deliveryType = activeDelivery?.delivery_type || activeDelivery?.order_delivery_type || "delivery";
+
+  const effectiveStages = (() => {
+    if (deliveryType === "collection") return COLLECTION_STAGES;
+    if (stopNumber > 1) {
+      const skipToIdx = DELIVERY_STAGES.indexOf("driving_to_customer");
+      return skipToIdx >= 0 ? DELIVERY_STAGES.slice(skipToIdx) : DELIVERY_STAGES;
+    }
+    return DELIVERY_STAGES;
+  })();
+
+  const currentStageIdx = currentStage ? effectiveStages.indexOf(currentStage) : -1;
+  const nextStageIdx = currentStage ? currentStageIdx + 1 : 0;
+  const nextStage = !currentStage ? effectiveStages[0] : (nextStageIdx < effectiveStages.length ? effectiveStages[nextStageIdx] : null);
+
+  // Stages completed for the pipeline (from allStages history)
+  const completedStageNames = allStages.filter(s => s.ended_at && s.stage !== "break").map(s => s.stage);
+
+  // Prompt for odometer (returns a promise)
+  const promptOdometer = (title) => new Promise((resolve) => {
+    setOdometerPromptTitle(title);
+    setOdometerPromptResolve(() => resolve);
+    setShowOdometerPrompt(true);
+  });
+
+  // Prompt for photo (returns a promise)
+  const promptPhoto = (title) => new Promise((resolve) => {
+    setPhotoCaptureTitle(title);
+    setPhotoCaptureResolve(() => resolve);
+    setShowPhotoCapture(true);
+  });
+
+  // Action label
+  const getNextActionLabel = () => {
+    if (isOnBreak) return "End Break";
+    if (!activeDelivery) return "No deliveries";
+    if (!currentStage && nextStage) return `Start: ${STAGE_LABELS[nextStage]}`;
+    if (currentStage && nextStage) return `Next: ${STAGE_LABELS[nextStage]}`;
+    if (currentStage && !nextStage) {
+      const nextDel = deliveries.find(d => d.id !== activeDelivery?.id && d.status !== "delivered" && d.status !== "collected");
+      if (nextDel) return "Complete & Next Stop →";
+      return "Complete Delivery ✓";
+    }
+    return "Ready";
+  };
+
+  // Is current stage a driving stage?
+  const isDrivingStage = (stage) => stage?.includes("driving");
+
+  const handleNextAction = async () => {
+    // End break
+    if (isOnBreak && breakStageId) {
+      try {
+        await api("/driver/break/end", { method: "POST", body: JSON.stringify({ stage_id: breakStageId }) }, token);
+        setIsOnBreak(false);
+        setBreakStageId(null);
+        setBreakStartedAt(null);
+        if (pausedStage) {
+          setCurrentStage(pausedStage);
+          setCurrentStageId(pausedStageId);
+          setPausedStage(null);
+          setPausedStageId(null);
+        }
+        toast("Break ended", "info");
+        loadData();
+      } catch (e) { toast(e.message, "error"); }
+      return;
+    }
+
+    if (!activeDelivery) return;
+    const loc = await getLocation();
+
+    // ---- End current stage ----
+    if (currentStageId) {
+      let endBody = { stage_id: currentStageId };
+
+      // If ending a driving stage, prompt for odometer
+      if (isDrivingStage(currentStage)) {
+        const odoData = await promptOdometer(`Ending: ${STAGE_LABELS[currentStage] || currentStage}`);
+        if (odoData) {
+          endBody.odometer = odoData.odometer || null;
+          endBody.manual_km = odoData.manual_km || null;
+        }
+      }
+
+      // If ending being_unloaded or being_unloaded_at_depot, prompt for POD photo
+      if (currentStage === "being_unloaded" || currentStage === "being_unloaded_at_depot" || currentStage === "being_loaded_at_customer") {
+        const photoData = await promptPhoto("Proof of Delivery");
+        if (photoData) {
+          endBody.photo_data = photoData;
+          // Also upload to photo endpoint
+          try {
+            await api("/driver/photo", {
+              method: "POST",
+              body: JSON.stringify({
+                delivery_log_id: activeDelivery.id,
+                shift_id: shift.id,
+                photo_type: "pod",
+                photo_data: photoData,
+                lat: loc.lat,
+                lng: loc.lng,
+              }),
+            }, token);
+          } catch (e) { console.warn("Photo upload failed:", e); }
+        }
+      }
+
+      try {
+        await api("/driver/stage/end", { method: "POST", body: JSON.stringify(endBody) }, token);
+      } catch (e) {
+        if (!navigator.onLine) {
+          queueOfflineAction({ type: "stage_end", data: endBody });
+          toast("Queued offline — will sync when connected", "info");
+        } else {
+          toast(e.message, "error");
+          return;
+        }
+      }
+    }
+
+    // ---- Start next stage or complete delivery ----
+    if (nextStage) {
+      let startBody = {
+        delivery_log_id: activeDelivery.id,
+        shift_id: shift.id,
+        stage: nextStage,
+        stop_number: stopNumber,
+        lat: loc.lat,
+        lng: loc.lng,
+        gps_accuracy: loc.accuracy,
+      };
+
+      // If starting a driving stage, prompt for odometer
+      if (isDrivingStage(nextStage)) {
+        const odoData = await promptOdometer(`Starting: ${STAGE_LABELS[nextStage] || nextStage}`);
+        if (odoData) {
+          startBody.odometer = odoData.odometer || null;
+        }
+      }
+
+      try {
+        const data = await api("/driver/stage/start", { method: "POST", body: JSON.stringify(startBody) }, token);
+        setCurrentStage(nextStage);
+        setCurrentStageId(data.id);
+        setStageStartedAt(data.started_at);
+
+        // Update delivery status
+        if (nextStage === "being_loaded" || nextStage === "being_loaded_at_customer") {
+          await api("/driver/delivery/status", { method: "PUT", body: JSON.stringify({ delivery_log_id: activeDelivery.id, status: "loaded" }) }, token).catch(() => {});
+        } else if (nextStage === "driving_to_customer" || nextStage === "driving_return") {
+          await api("/driver/delivery/status", { method: "PUT", body: JSON.stringify({ delivery_log_id: activeDelivery.id, status: "in_transit" }) }, token).catch(() => {});
+        }
+
+        // Show stage complete prompt for next action info
+        const prevStageName = currentStage;
+        const prevStageDuration = (() => {
+          const found = allStages.filter(s => s.stage === prevStageName && s.ended_at).sort((a, b) => b.started_at > a.started_at ? 1 : -1)[0];
+          return found ? (found.duration_minutes || 0) : 0;
+        })();
+
+        toast(`${STAGE_LABELS[nextStage]}`, "success");
+      } catch (e) {
+        if (!navigator.onLine) {
+          queueOfflineAction({ type: "stage_start", data: startBody });
+          setCurrentStage(nextStage);
+          setStageStartedAt(new Date().toISOString());
+          toast("Queued offline — will sync when connected", "info");
+        } else {
+          toast(e.message, "error");
+          return;
+        }
+      }
+    } else {
+      // Complete delivery
+      const nextDel = deliveries.find(d => d.id !== activeDelivery.id && d.status !== "delivered" && d.status !== "collected");
+
+      try {
+        await api("/driver/delivery/complete", {
+          method: "POST",
+          body: JSON.stringify({
+            delivery_log_id: activeDelivery.id,
+            shift_id: shift.id,
+            total_km: 0,
+            tolls: 0,
+          }),
+        }, token);
+
+        setCurrentStage(null);
+        setCurrentStageId(null);
+        setStageStartedAt(null);
+        toast(deliveryType === "collection" ? "Collection complete!" : "Delivery complete!", "success");
+
+        // Try to show cost breakdown
+        try {
+          const costs = await api(`/driver/cost-breakdown?delivery_log_id=${activeDelivery.id}`, {}, token);
+          if (costs) {
+            setCostBreakdownData(costs);
+            setShowCostBreakdown(true);
+          }
+        } catch (e) { /* cost breakdown is optional */ }
+
+        // Show multi-drop prompt
+        setMultiDropNextDelivery(nextDel || null);
+        setShowMultiDrop(true);
+      } catch (e) { toast(e.message, "error"); return; }
+    }
+
+    loadData();
+  };
+
+  const handleBreak = async () => {
+    if (isOnBreak) return;
+    const loc = await getLocation();
+    setPausedStage(currentStage);
+    setPausedStageId(currentStageId);
+    try {
+      const data = await api("/driver/break/start", {
+        method: "POST",
+        body: JSON.stringify({
+          delivery_log_id: activeDelivery?.id,
+          shift_id: shift.id,
+          lat: loc.lat,
+          lng: loc.lng,
+        }),
+      }, token);
+      setIsOnBreak(true);
+      setBreakStageId(data.id);
+      setBreakStartedAt(data.started_at);
+      setStageStartedAt(data.started_at);
+      toast("Break started", "info");
+      setShowFatigueBlocker(false);
+      loadData();
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const handleClockOff = async () => {
+    setMenuOpen(false);
+    if (!confirm("End your shift and clock off?")) return;
+
+    // Prompt for ending odometer
+    const odoData = await promptOdometer("Ending Odometer Reading");
+    const odometerEnd = odoData ? (odoData.odometer || null) : null;
+
+    // End any active stage
+    if (currentStageId) {
+      try { await api("/driver/stage/end", { method: "POST", body: JSON.stringify({ stage_id: currentStageId }) }, token); } catch {}
+    }
+    if (breakStageId) {
+      try { await api("/driver/break/end", { method: "POST", body: JSON.stringify({ stage_id: breakStageId }) }, token); } catch {}
+    }
+    try {
+      await api("/driver/clock-off", { method: "POST", body: JSON.stringify({ odometer_end: odometerEnd }) }, token);
+      toast("Shift complete — drive safe!", "success");
+      onClockOff();
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const handleShowSummary = async () => {
+    try {
+      const costs = await api(`/driver/cost-breakdown?shift_id=${shift.id}`, {}, token);
+      setShiftCosts(costs ? [costs] : []);
+    } catch {}
+    setShowSummary(true);
+    setMenuOpen(false);
+  };
+
+  const handleMultiDropNext = () => {
+    setShowMultiDrop(false);
+    setStopNumber(s => s + 1);
+    // Start from driving_to_customer for next stop
+    setCurrentStage(null);
+    setCurrentStageId(null);
+    loadData();
+  };
+
+  const handleMultiDropReturn = () => {
+    setShowMultiDrop(false);
+    setCurrentStage(null);
+    setCurrentStageId(null);
+    loadData();
+  };
+
+  // Offline queue display
+  const pendingOfflineCount = offlineQueue.length;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-navy border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500 text-lg">Loading your run...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Fatigue blocker — blocks entire screen if needed */}
+      {showFatigueBlocker && (
+        <FatigueBlocker
+          type={fatigueBlockerType}
+          onBreak={handleBreak}
+          onClockOff={handleClockOff}
+        />
+      )}
+
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="offline-banner">
+          📴 Offline — actions will sync when reconnected
+          {pendingOfflineCount > 0 && ` (${pendingOfflineCount} queued)`}
+        </div>
+      )}
+      {isOnline && pendingOfflineCount > 0 && (
+        <div style={{ background: "#F59E0B" }} className="text-white text-center py-2 font-bold text-sm px-4">
+          🔄 Syncing {pendingOfflineCount} offline action{pendingOfflineCount > 1 ? "s" : ""}...
+        </div>
+      )}
+
+      {/* Fatigue warning banner (non-blocking) */}
+      {fatigueWarning && fatigueWarning.level === "warning" && (
+        <div className="fatigue-warning">
+          ⚠️ {fatigueWarning.message || "Approaching break threshold — consider taking a break"}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-navy text-white px-4 py-3 flex items-center justify-between" style={{ paddingTop: "env(safe-area-inset-top, 12px)" }}>
+        <div className="flex items-center gap-3">
+          <div style={{ width:28, height:28, background:"#ED1C24", clipPath:"polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }} />
+          <div>
+            <div className="text-base font-bold">{user.full_name} — {shift.truck_name || `Truck ${shift.truck_id}`}</div>
+            <div className="text-xs text-white/60">{shift.truck_rego} • {new Date().toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}</div>
+          </div>
+        </div>
+        <button onClick={() => setMenuOpen(true)} className="p-2 text-2xl" style={{ minWidth: 44, minHeight: 44 }}>☰</button>
+      </div>
+
+      {/* Timer */}
+      <TimerDisplay stage={isOnBreak ? "break" : currentStage} startedAt={stageStartedAt} isBreak={isOnBreak} />
+
+      {/* Stage pipeline */}
+      {activeDelivery && (
+        <StagePipeline
+          stages={effectiveStages}
+          currentStage={isOnBreak ? null : currentStage}
+          completedStages={completedStageNames}
+        />
+      )}
+
+      {/* Run summary bar */}
+      <div className="bg-white px-4 py-3 flex justify-between border-b border-gray-200">
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Stops</div>
+          <div className="text-lg font-bold text-navy">{deliveries.length}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Est. Time</div>
+          <div className="text-lg font-bold text-navy">
+            {fmtMins(deliveries.reduce((a, d) => a + (d.estimated_travel_minutes || d.estimated_minutes || 30), 0))}
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Units</div>
+          <div className="text-lg font-bold text-navy">
+            {deliveries.reduce((a, d) => a + (d.total_qty || 0), 0)}
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Done</div>
+          <div className="text-lg font-bold text-green-600">
+            {deliveries.filter(d => d.status === "delivered" || d.status === "collected").length}/{deliveries.length}
+          </div>
+        </div>
+      </div>
+
+      {/* Tab content */}
+      <div className="content-scroll">
+        {tab === "current" ? (
+          <div className="px-4 pb-4">
+            {allStages.length > 0 && <StageHistory stages={allStages} />}
+            {deliveries.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-5xl mb-4">📦</div>
+                <p className="text-xl text-gray-500">No deliveries assigned today</p>
+                <p className="text-base text-gray-400 mt-2">Check with dispatch for your load</p>
+              </div>
+            ) : (
+              deliveries.map((d, i) => (
+                <DeliveryCard key={d.id} delivery={d}
+                              isActive={activeDelivery?.id === d.id}
+                              onTap={() => setActiveDeliveryIdx(i)} />
+              ))
+            )}
+          </div>
+        ) : tab === "upcoming" ? (
+          <div className="px-4 pb-4 pt-3">
+            {upcoming.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-xl text-gray-500">No upcoming runs</p>
+              </div>
+            ) : (
+              upcoming.map(d => <DeliveryCard key={d.id} delivery={d} isActive={false} onTap={() => {}} />)
+            )}
+          </div>
+        ) : (
+          <LogbookTab shift={shift} token={token} />
+        )}
+      </div>
+
+      {/* Break button (floating) */}
+      {currentStage && !isOnBreak && (
+        <button onClick={handleBreak}
+                className="fixed right-4 text-white font-bold px-5 py-3 rounded-full shadow-lg text-base"
+                style={{ bottom: "148px", background: "#6B7280", zIndex: 40, minHeight: 44 }}>
+          ☕ Break
+        </button>
+      )}
+
+      {/* Next Action Button */}
+      <div className="action-btn">
+        <button onClick={handleNextAction}
+                disabled={!activeDelivery && !isOnBreak}
+                style={{ background: isOnBreak ? "#6B7280" : (currentStage && !nextStage ? "#059669" : "#07324C") }}>
+          {getNextActionLabel()}
+        </button>
+      </div>
+
+      {/* Tab bar — 3 tabs */}
+      <div className="tab-bar">
+        <button className={tab === "current" ? "active" : ""} onClick={() => setTab("current")}>
+          📦 Current Load
+        </button>
+        <button className={tab === "upcoming" ? "active" : ""} onClick={() => setTab("upcoming")}>
+          📋 Upcoming
+        </button>
+        <button className={tab === "logbook" ? "active" : ""} onClick={() => setTab("logbook")}>
+          📓 Logbook
+        </button>
+      </div>
+
+      {/* Menu overlay */}
+      {menuOpen && (
+        <>
+          <div className="menu-overlay" onClick={() => setMenuOpen(false)} />
+          <div className="menu-panel">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-navy">Menu</h3>
+              <button onClick={() => setMenuOpen(false)} className="text-2xl text-gray-400 w-10 h-10 flex items-center justify-center">&times;</button>
+            </div>
+            <div className="menu-item" onClick={handleShowSummary}>📊 Shift Summary</div>
+            <div className="menu-item" onClick={() => { setShowRunSheet(true); setMenuOpen(false); }}>📋 Run Sheet</div>
+            <div className="menu-item" onClick={() => { setShowIncident(true); setMenuOpen(false); }}>⚠️ Report Incident</div>
+            <div className="menu-item" onClick={() => { setShowGPSStatus(true); setMenuOpen(false); }}>📍 GPS Status</div>
+            <div className="menu-item" onClick={() => { loadData(); setMenuOpen(false); toast("Refreshed", "info"); }}>🔄 Refresh Data</div>
+            <div className="menu-item" style={{ color: "#ED1C24" }} onClick={handleClockOff}>🔴 Clock Off</div>
+          </div>
+        </>
+      )}
+
+      {/* Modals */}
+
+      {/* Stage Complete Prompt */}
+      {showStageComplete && stageCompleteData && (
+        <StageCompletePrompt
+          completedStage={stageCompleteData.stage}
+          completedDuration={stageCompleteData.duration}
+          nextStage={stageCompleteData.nextStage}
+          onStartNext={() => { setShowStageComplete(false); if (stageCompleteData.onNext) stageCompleteData.onNext(); }}
+          onBreak={() => { setShowStageComplete(false); handleBreak(); }}
+          onClose={() => setShowStageComplete(false)}
+        />
+      )}
+
+      {/* Multi-Drop Prompt */}
+      {showMultiDrop && (
+        <MultiDropPrompt
+          nextDelivery={multiDropNextDelivery}
+          onNextStop={handleMultiDropNext}
+          onReturnDepot={handleMultiDropReturn}
+        />
+      )}
+
+      {/* Odometer Prompt */}
+      {showOdometerPrompt && (
+        <OdometerPrompt
+          title={odometerPromptTitle}
+          onConfirm={(data) => {
+            setShowOdometerPrompt(false);
+            if (odometerPromptResolve) {
+              odometerPromptResolve(data);
+              setOdometerPromptResolve(null);
+            }
+          }}
+          onSkip={() => {
+            setShowOdometerPrompt(false);
+            if (odometerPromptResolve) {
+              odometerPromptResolve(null);
+              setOdometerPromptResolve(null);
+            }
+          }}
+        />
+      )}
+
+      {/* Photo Capture */}
+      {showPhotoCapture && (
+        <PhotoCapture
+          title={photoCaptureTitle}
+          onConfirm={(base64) => {
+            setShowPhotoCapture(false);
+            if (photoCaptureResolve) {
+              photoCaptureResolve(base64);
+              setPhotoCaptureResolve(null);
+            }
+          }}
+          onSkip={() => {
+            setShowPhotoCapture(false);
+            if (photoCaptureResolve) {
+              photoCaptureResolve(null);
+              setPhotoCaptureResolve(null);
+            }
+          }}
+        />
+      )}
+
+      {/* Cost Breakdown Modal (after delivery complete) */}
+      {showCostBreakdown && costBreakdownData && (
+        <CostBreakdownModal
+          costs={costBreakdownData}
+          title="Delivery Cost Breakdown"
+          onClose={() => setShowCostBreakdown(false)}
+        />
+      )}
+
+      {/* Shift Summary Modal */}
+      {showSummary && (
+        <ShiftSummary shift={shift} stages={allStages} costs={shiftCosts} onClose={() => setShowSummary(false)} />
+      )}
+
+      {/* Run Sheet Modal */}
+      {showRunSheet && (
+        <RunSheetView shift={shift} token={token} onClose={() => setShowRunSheet(false)} />
+      )}
+
+      {/* Incident Report Modal */}
+      {showIncident && (
+        <IncidentReport shift={shift} token={token} deliveries={deliveries} onClose={() => setShowIncident(false)} />
+      )}
+
+      {/* GPS Status Modal */}
+      {showGPSStatus && (
+        <GPSStatusModal shift={shift} token={token} onClose={() => setShowGPSStatus(false)} />
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// APP ROOT — with odometer screen between safety and truck
+// ═══════════════════════════════════════════════════════════════
+const App = () => {
+  const [screen, setScreen] = useState("login"); // login | safety | odometer | truck | app
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [defaultTruck, setDefaultTruck] = useState(null);
+  const [trucks, setTrucks] = useState([]);
+  const [shift, setShift] = useState(null);
+  const [clockLoading, setClockLoading] = useState(false);
+  const [safetyChecklist, setSafetyChecklist] = useState([]);
+  const [odometerStart, setOdometerStart] = useState(null);
+
+  // Restore session
+  useEffect(() => {
+    const saved = localStorage.getItem("driver_session");
+    if (saved) {
+      try {
+        const s = JSON.parse(saved);
+        setToken(s.token);
+        setUser(s.user);
+        api("/driver/shift", {}, s.token).then(data => {
+          if (data) {
+            setShift(data);
+            setScreen("app");
+          } else {
+            loadTrucks(s.token);
+            setScreen("safety");
+          }
+        }).catch(() => {
+          localStorage.removeItem("driver_session");
+        });
+      } catch {
+        localStorage.removeItem("driver_session");
+      }
+    }
+  }, []);
+
+  const loadTrucks = async (tok) => {
+    try {
+      const data = await api("/driver/trucks", {}, tok);
+      setTrucks(data || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleLogin = (data) => {
+    setToken(data.token);
+    setUser(data.user);
+    setDefaultTruck(data.default_truck || null);
+    localStorage.setItem("driver_session", JSON.stringify({ token: data.token, user: data.user }));
+
+    api("/driver/shift", {}, data.token).then(shiftData => {
+      if (shiftData) {
+        setShift(shiftData);
+        setScreen("app");
+      } else {
+        loadTrucks(data.token);
+        setScreen("safety");
+      }
+    }).catch(() => {
+      loadTrucks(data.token);
+      setScreen("safety");
+    });
+  };
+
+  const handleSafetyConfirm = (checklist) => {
+    setSafetyChecklist(checklist);
+    setScreen("odometer");
+  };
+
+  const handleOdometerConfirm = (value) => {
+    setOdometerStart(value);
+    setScreen("truck");
+  };
+
+  const handleTruckSelect = async (truckId) => {
+    setClockLoading(true);
+    try {
+      const data = await api("/driver/clock-on", {
+        method: "POST",
+        body: JSON.stringify({
+          truck_id: truckId,
+          safety_checklist: safetyChecklist,
+          odometer_start: odometerStart,
+        }),
+      }, token);
+      const shiftData = await api("/driver/shift", {}, token);
+      setShift(shiftData || data);
+      setScreen("app");
+      toast("Shift started — let's go!", "success");
+    } catch (e) {
+      if (e.message.includes("Already clocked on")) {
+        try {
+          const shiftData = await api("/driver/shift", {}, token);
+          setShift(shiftData);
+          setScreen("app");
+        } catch (e2) { toast(e2.message, "error"); }
+      } else {
+        toast(e.message, "error");
+      }
+    } finally {
+      setClockLoading(false);
+    }
+  };
+
+  const handleClockOff = () => {
+    localStorage.removeItem("driver_session");
+    setScreen("login");
+    setToken(null);
+    setUser(null);
+    setShift(null);
+    setSafetyChecklist([]);
+    setOdometerStart(null);
+  };
+
+  switch (screen) {
+    case "login":
+      return <PinLogin onLogin={handleLogin} />;
+    case "safety":
+      return <SafetyChecklist onConfirm={handleSafetyConfirm} driverName={user?.full_name || "Driver"} />;
+    case "odometer":
+      return <OdometerEntry onConfirm={handleOdometerConfirm} />;
+    case "truck":
+      return <TruckSelect trucks={trucks} defaultTruck={defaultTruck} onSelect={handleTruckSelect} loading={clockLoading} />;
+    case "app":
+      return <DriverApp user={user} token={token} shift={shift} onClockOff={handleClockOff} />;
+    default:
+      return <PinLogin onLogin={handleLogin} />;
+  }
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW registration failed:', e));
+}
+</script>
+</body>
+</html>

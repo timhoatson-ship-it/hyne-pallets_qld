@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Hyne Pallets — Chainsaw</title>
+  <link rel="manifest" href="/manifest-chainsaw.json" />
+  <meta name="theme-color" content="#07324C" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin:0; padding:0; background:#07324C; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; font-size:18px; color:white; min-height:100vh; }
+    .pin-dot { width:18px; height:18px; border-radius:50%; border:2px solid white; margin:0 8px; transition:all .15s; }
+    .pin-dot.filled { background:white; }
+    .pin-key { width:80px; height:80px; border-radius:50%; border:2px solid rgba(255,255,255,0.4); display:flex;
+               align-items:center; justify-content:center; font-size:28px; font-weight:600; color:white;
+               cursor:pointer; user-select:none; transition:all .1s; background:transparent; }
+    .pin-key:active { background:rgba(255,255,255,0.2); transform:scale(0.95); }
+    .pin-key.delete { border-color:#ED1C24; color:#ED1C24; font-size:16px; }
+    .pin-key.delete:active { background:#ED1C24; color:white; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const API_BASE = window.location.origin + '/api';
+const SESSION_KEY = 'hyne_chainsaw_session';
+const APP_NAME = 'CHAINSAW APP';
+const PAGE_KEY = 'chainsaw';
+
+const api = async (path, options = {}, token = null) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(API_BASE + path, { ...options, headers });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+};
+
+// ═══════════ PIN LOGIN ═══════════
+const PinLogin = ({ onLogin }) => {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const addDigit = (d) => {
+    if (pin.length >= 6) return;
+    const newPin = pin + d;
+    setPin(newPin);
+    setError('');
+    if (newPin.length === 6) doLogin(newPin);
+  };
+
+  const doLogin = async (p) => {
+    setLoading(true);
+    try {
+      const data = await api('/driver/pin-login', { method: 'POST', body: JSON.stringify({ pin: p }) });
+      if (data.token) {
+        // Verify this user has chainsaw access
+        if (data.user && (data.user.role === 'chainsaw' || data.user.role === 'executive' || data.user.role === 'admin' || data.user.role === 'floor_worker')) {
+          onLogin(data);
+        } else {
+          setError('Access denied for this role'); setPin('');
+        }
+      } else {
+        setError('Invalid PIN'); setPin('');
+      }
+    } catch {
+      setError('Invalid PIN — try again'); setPin('');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px',background:'#07324C'}}>
+      <div style={{fontWeight:900,fontSize:'22px',letterSpacing:'0.12em',marginBottom:'4px'}}>HYNE PALLETS</div>
+      <div style={{fontSize:'15px',color:'#ABBFC8',letterSpacing:'0.08em',marginBottom:'32px'}}>{APP_NAME}</div>
+      <div style={{display:'flex',marginBottom:'24px'}}>
+        {[0,1,2,3,4,5].map(i => <div key={i} className={`pin-dot ${i < pin.length ? 'filled' : ''}`} style={{borderColor: error ? '#ED1C24' : 'white', background: i < pin.length ? 'white' : 'transparent'}} />)}
+      </div>
+      {error && <div style={{color:'#ED1C24',fontSize:'15px',marginBottom:'12px',fontWeight:600}}>{error}</div>}
+      {loading && <div style={{color:'#ABBFC8',fontSize:'15px',marginBottom:'12px'}}>Checking...</div>}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'14px',maxWidth:'280px'}}>
+        {[1,2,3,4,5,6,7,8,9].map(d => <div key={d} className="pin-key" onClick={() => addDigit(String(d))}>{d}</div>)}
+        <div />
+        <div className="pin-key" onClick={() => addDigit('0')}>0</div>
+        <div className="pin-key delete" onClick={() => { setPin(''); setError(''); }}>CLR</div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════ APP ═══════════
+const App = () => {
+  const [ready, setReady] = useState(false);
+  const [needLogin, setNeedLogin] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (saved) {
+      try {
+        const s = JSON.parse(saved);
+        // Verify token still valid
+        api('/auth/me', {}, s.token).then(data => {
+          if (data && data.id) {
+            // Valid session — redirect to main app
+            doRedirect(s.token, s.user);
+          } else {
+            localStorage.removeItem(SESSION_KEY);
+            setNeedLogin(true);
+          }
+        }).catch(() => { localStorage.removeItem(SESSION_KEY); setNeedLogin(true); });
+      } catch { localStorage.removeItem(SESSION_KEY); setNeedLogin(true); }
+    } else {
+      setNeedLogin(true);
+    }
+    setReady(true);
+  }, []);
+
+  const doRedirect = (token, user) => {
+    const params = new URLSearchParams({ _token: token, _role: user.role, _page: PAGE_KEY, _app: PAGE_KEY });
+    window.location.href = '/?' + params.toString();
+  };
+
+  const handleLogin = (data) => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: data.token, user: data.user }));
+    doRedirect(data.token, data.user);
+  };
+
+  if (!ready) return null;
+  if (needLogin) return <PinLogin onLogin={handleLogin} />;
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#07324C'}}>
+      <div style={{fontWeight:900,fontSize:'22px',letterSpacing:'0.12em',marginBottom:'8px'}}>HYNE PALLETS</div>
+      <div style={{color:'#ABBFC8',fontSize:'16px'}}>Loading Chainsaw App...</div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
