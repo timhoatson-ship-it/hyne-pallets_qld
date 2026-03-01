@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Hyne Pallets — Driver App</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#07324C',
+            'red-hp': '#ED1C24',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin:0; padding:0; background:#F5F7FA; font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+           font-size:18px; overscroll-behavior:none; }
+    /* Large text globally - 2 sizes up from default */
+    html { font-size: 18px; }
+    /* Pin pad */
+    .pin-dot { width:18px; height:18px; border-radius:50%; border:2px solid #07324C; margin:0 8px; transition:all .15s; }
+    .pin-dot.filled { background:#07324C; }
+    .pin-key { width:80px; height:80px; border-radius:50%; border:2px solid #07324C; display:flex;
+               align-items:center; justify-content:center; font-size:28px; font-weight:600; color:#07324C;
+               cursor:pointer; user-select:none; transition:all .1s; background:white; }
+    .pin-key:active { background:#07324C; color:white; transform:scale(0.95); }
+    .pin-key.delete { border-color:#ED1C24; color:#ED1C24; font-size:16px; }
+    .pin-key.delete:active { background:#ED1C24; color:white; }
+    /* Timer pulse */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .pulse-dot { width:14px; height:14px; border-radius:50%; animation:pulse 1.5s ease-in-out infinite; display:inline-block; }
+    /* Stage colors */
+    .stage-waiting { background:#F59E0B; }
+    .stage-loading { background:#3B82F6; }
+    .stage-driving { background:#10B981; }
+    .stage-break { background:#6B7280; }
+    .stage-bar-waiting { border-left:5px solid #F59E0B; }
+    .stage-bar-loading { border-left:5px solid #3B82F6; }
+    .stage-bar-driving { border-left:5px solid #10B981; }
+    .stage-bar-break { border-left:5px solid #6B7280; }
+    /* Delivery card stripes */
+    .card-pending { border-left:5px solid #9CA3AF; }
+    .card-loaded { border-left:5px solid #3B82F6; }
+    .card-in_transit { border-left:5px solid #10B981; }
+    .card-delivered { border-left:5px solid #059669; }
+    .card-collected { border-left:5px solid #8B5CF6; }
+    /* Toast */
+    .toast-container { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; }
+    .toast { padding:12px 20px; border-radius:10px; color:white; font-size:16px; font-weight:500;
+             animation:slideIn .3s ease; min-width:280px; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+    .toast-success { background:#059669; }
+    .toast-error { background:#DC2626; }
+    .toast-info { background:#07324C; }
+    @keyframes slideIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+    /* Checkbox */
+    .safety-check { width:28px; height:28px; accent-color:#07324C; }
+    /* Bottom action button */
+    .action-btn { position:fixed; bottom:80px; left:16px; right:16px; z-index:50; }
+    .action-btn button { width:100%; padding:20px; border-radius:16px; font-size:20px; font-weight:700;
+                         color:white; border:none; cursor:pointer; transition:all .15s; box-shadow:0 4px 16px rgba(0,0,0,.2); }
+    .action-btn button:active { transform:scale(0.98); }
+    .action-btn button:disabled { opacity:.4; cursor:not-allowed; }
+    /* Tabs */
+    .tab-bar { position:fixed; bottom:0; left:0; right:0; background:white; display:flex;
+               border-top:2px solid #E5E7EB; z-index:50; }
+    .tab-bar button { flex:1; padding:14px 0 10px; text-align:center; border:none; background:none;
+                      font-size:14px; font-weight:600; color:#9CA3AF; cursor:pointer; }
+    .tab-bar button.active { color:#07324C; border-top:3px solid #07324C; }
+    /* Hamburger menu */
+    .menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; }
+    .menu-panel { position:fixed; top:0; right:0; bottom:0; width:280px; background:white; z-index:101;
+                  box-shadow:-4px 0 20px rgba(0,0,0,.2); padding:24px; }
+    .menu-item { padding:16px 0; border-bottom:1px solid #E5E7EB; font-size:18px; color:#07324C;
+                 cursor:pointer; font-weight:500; }
+    .menu-item:active { color:#ED1C24; }
+    /* Scrollable content area */
+    .content-scroll { padding-bottom:160px; overflow-y:auto; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toast-container" class="toast-container"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ═══════════════════════════════════════════════════════════════
+// API & HELPERS
+// ═══════════════════════════════════════════════════════════════
+const API = "/api";
+const api = async (path, options = {}, token = null) => {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  let url = `${API}${path}`;
+  if (token && !headers["Authorization"]) {
+    url += (url.includes("?") ? "&" : "?") + `_token=${encodeURIComponent(token)}`;
+  }
+  const res = await fetch(url, { ...options, headers });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { error: text }; }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+};
+
+const toast = (msg, type = "info") => {
+  const el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+};
+
+const fmtTime = (seconds) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+};
+
+const fmtMins = (mins) => {
+  if (!mins) return "—";
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
+
+const STAGE_LABELS = {
+  waiting_to_load: "Waiting to Load",
+  being_loaded: "Being Loaded",
+  tie_down: "Tie Down",
+  driving_to_customer: "Driving to Customer",
+  waiting_at_customer: "Waiting at Customer",
+  being_unloaded: "Being Unloaded",
+  driving_return: "Driving Return",
+  break: "On Break",
+  being_loaded_at_customer: "Being Loaded (Customer)",
+  being_unloaded_at_depot: "Being Unloaded (Depot)",
+};
+
+const STAGE_TYPE = (stage) => {
+  if (stage === "break") return "break";
+  if (stage?.includes("waiting")) return "waiting";
+  if (stage?.includes("loaded") || stage?.includes("loading") || stage?.includes("unload") || stage === "tie_down") return "loading";
+  if (stage?.includes("driving")) return "driving";
+  return "waiting";
+};
+
+const STAGE_COLOR_CLASS = (stage) => {
+  const t = STAGE_TYPE(stage);
+  return { waiting: "stage-waiting", loading: "stage-loading", driving: "stage-driving", break: "stage-break" }[t] || "stage-waiting";
+};
+
+const STAGE_BAR_CLASS = (stage) => {
+  const t = STAGE_TYPE(stage);
+  return { waiting: "stage-bar-waiting", loading: "stage-bar-loading", driving: "stage-bar-driving", break: "stage-bar-break" }[t] || "stage-bar-waiting";
+};
+
+const STAGE_BG = (stage) => {
+  const t = STAGE_TYPE(stage);
+  return { waiting: "#F59E0B", loading: "#3B82F6", driving: "#10B981", break: "#6B7280" }[t] || "#F59E0B";
+};
+
+// Delivery stage pipeline
+const DELIVERY_STAGES = [
+  "waiting_to_load", "being_loaded", "tie_down",
+  "driving_to_customer", "waiting_at_customer", "being_unloaded", "driving_return"
+];
+const COLLECTION_STAGES = [
+  "driving_to_customer", "waiting_at_customer", "being_loaded_at_customer",
+  "tie_down", "driving_return", "being_unloaded_at_depot"
+];
+
+const getLocation = () => new Promise((resolve) => {
+  if (!navigator.geolocation) return resolve({ lat: null, lng: null });
+  navigator.geolocation.getCurrentPosition(
+    (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    () => resolve({ lat: null, lng: null }),
+    { timeout: 5000, enableHighAccuracy: false }
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PIN LOGIN SCREEN
+// ═══════════════════════════════════════════════════════════════
+const PinLogin = ({ onLogin }) => {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const addDigit = (d) => {
+    if (pin.length >= 6) return;
+    const newPin = pin + d;
+    setPin(newPin);
+    setError("");
+    if (newPin.length === 6) {
+      doLogin(newPin);
+    }
+  };
+
+  const doLogin = async (p) => {
+    setLoading(true);
+    try {
+      const data = await api("/driver/pin-login", {
+        method: "POST",
+        body: JSON.stringify({ pin: p }),
+      });
+      onLogin(data);
+    } catch (e) {
+      setError("Invalid PIN — try again");
+      setPin("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ background: "linear-gradient(180deg, #07324C 0%, #0A4A6E 100%)" }}>
+      {/* Logo */}
+      <div className="mb-6 text-center">
+        <div className="inline-flex items-center gap-3 mb-2">
+          <div style={{ width:40, height:40, background:"#ED1C24", clipPath:"polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }} />
+          <span className="text-white text-3xl font-bold tracking-wide">HYNE PALLETS</span>
+        </div>
+        <p className="text-white/60 text-base">Express Pallets & Crates — Narangba</p>
+        <p className="text-white/80 text-xl mt-4 font-semibold">Driver Login</p>
+      </div>
+
+      {/* PIN dots */}
+      <div className="flex mb-8">
+        {[0,1,2,3,4,5].map(i => (
+          <div key={i} className={`pin-dot ${i < pin.length ? "filled" : ""}`}
+               style={{ borderColor: error ? "#ED1C24" : "white", background: i < pin.length ? "white" : "transparent" }} />
+        ))}
+      </div>
+
+      {error && <p className="text-red-400 mb-4 text-base font-medium">{error}</p>}
+      {loading && <p className="text-white/70 mb-4">Logging in...</p>}
+
+      {/* Numpad */}
+      <div className="grid grid-cols-3 gap-4">
+        {[1,2,3,4,5,6,7,8,9,null,0,"del"].map((k, i) => (
+          k === null ? <div key={i} /> :
+          k === "del" ? (
+            <button key={i} className="pin-key delete" style={{ borderColor:"#ED1C24", color:"#ED1C24", background:"rgba(255,255,255,.95)" }}
+                    onClick={() => { setPin(pin.slice(0,-1)); setError(""); }}>
+              &#9003;
+            </button>
+          ) : (
+            <button key={i} className="pin-key" style={{ background:"rgba(255,255,255,.95)" }}
+                    onClick={() => addDigit(String(k))}>
+              {k}
+            </button>
+          )
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SAFETY CHECKLIST
+// ═══════════════════════════════════════════════════════════════
+const SAFETY_ITEMS = [
+  { id: "walkaround", label: "Vehicle walkaround inspection complete" },
+  { id: "restraints", label: "Load restraint equipment checked" },
+  { id: "ppe", label: "PPE worn (hi-vis, steel caps)" },
+  { id: "fit", label: "Fit for duty (no fatigue, no impairment)" },
+  { id: "firstaid", label: "First aid kit present" },
+  { id: "fire", label: "Fire extinguisher present" },
+];
+
+const SafetyChecklist = ({ onConfirm, driverName }) => {
+  const [checks, setChecks] = useState({});
+  const allChecked = SAFETY_ITEMS.every(item => checks[item.id]);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-white">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h2 className="text-2xl font-bold text-navy">Pre-Trip Safety Check</h2>
+          <p className="text-gray-500 mt-1">G'day {driverName} — tick all items before starting your shift</p>
+        </div>
+
+        <div className="space-y-3 mb-8">
+          {SAFETY_ITEMS.map(item => (
+            <label key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl cursor-pointer"
+                   style={{ border: checks[item.id] ? "2px solid #07324C" : "2px solid transparent" }}>
+              <input type="checkbox" className="safety-check" checked={!!checks[item.id]}
+                     onChange={(e) => setChecks({ ...checks, [item.id]: e.target.checked })} />
+              <span className="text-lg" style={{ color: checks[item.id] ? "#07324C" : "#6B7280" }}>{item.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <button onClick={() => onConfirm(checks)} disabled={!allChecked}
+                className="w-full py-5 rounded-2xl text-xl font-bold text-white transition-all"
+                style={{ background: allChecked ? "#07324C" : "#D1D5DB", boxShadow: allChecked ? "0 4px 16px rgba(7,50,76,.3)" : "none" }}>
+          Confirm &amp; Start Shift
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TRUCK SELECTION
+// ═══════════════════════════════════════════════════════════════
+const TruckSelect = ({ trucks, defaultTruck, onSelect, loading }) => {
+  const [selected, setSelected] = useState(defaultTruck?.id || null);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-white">
+      <div className="w-full max-w-md">
+        <h2 className="text-2xl font-bold text-navy text-center mb-2">Select Your Truck</h2>
+        <p className="text-gray-500 text-center mb-6">Which truck are you driving today?</p>
+
+        <div className="space-y-3 mb-8">
+          {trucks.map(t => (
+            <button key={t.id} onClick={() => setSelected(t.id)}
+                    className="w-full p-5 rounded-xl text-left transition-all flex items-center gap-4"
+                    style={{ border: selected === t.id ? "3px solid #07324C" : "2px solid #E5E7EB",
+                             background: selected === t.id ? "#F0F7FF" : "white" }}>
+              <div className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl"
+                   style={{ background: selected === t.id ? "#07324C" : "#E5E7EB",
+                            color: selected === t.id ? "white" : "#6B7280" }}>
+                {t.id}
+              </div>
+              <div>
+                <div className="text-lg font-bold" style={{ color: "#07324C" }}>{t.name}</div>
+                <div className="text-base text-gray-500">{t.rego} — {t.driver_name}</div>
+              </div>
+              {selected === t.id && <span className="ml-auto text-2xl" style={{ color: "#07324C" }}>✓</span>}
+            </button>
+          ))}
+        </div>
+
+        <button onClick={() => onSelect(selected)} disabled={!selected || loading}
+                className="w-full py-5 rounded-2xl text-xl font-bold text-white"
+                style={{ background: selected ? "#07324C" : "#D1D5DB" }}>
+          {loading ? "Starting Shift..." : "Start Shift"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TIMER DISPLAY
+// ═══════════════════════════════════════════════════════════════
+const TimerDisplay = ({ stage, startedAt, isBreak }) => {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!startedAt) { setElapsed(0); return; }
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const stageLabel = isBreak ? "On Break" : (STAGE_LABELS[stage] || stage || "Ready");
+  const bg = isBreak ? "#6B7280" : STAGE_BG(stage);
+
+  return (
+    <div className="w-full px-4 py-5 text-center text-white" style={{ background: bg }}>
+      <div className="flex items-center justify-center gap-3 mb-2">
+        {startedAt && <div className="pulse-dot" style={{ background: "white" }} />}
+        <span className="text-lg font-semibold uppercase tracking-wider">{stageLabel}</span>
+      </div>
+      <div className="text-5xl font-mono font-bold tracking-wider">
+        {startedAt ? fmtTime(elapsed) : "--:--"}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVERY CARD
+// ═══════════════════════════════════════════════════════════════
+const DeliveryCard = ({ delivery, isActive, onTap }) => {
+  const status = delivery.status || "pending";
+  const type = delivery.delivery_type || delivery.order_delivery_type || "delivery";
+
+  return (
+    <div onClick={onTap}
+         className={`bg-white rounded-xl shadow-sm mb-3 p-4 card-${status} cursor-pointer transition-all`}
+         style={{ opacity: status === "delivered" || status === "collected" ? 0.6 : 1,
+                  border: isActive ? "2px solid #07324C" : "1px solid #E5E7EB" }}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <div className="text-lg font-bold text-navy">{delivery.client_name || "Unknown Client"}</div>
+          <div className="text-base text-gray-500">
+            {delivery.street_address && `${delivery.street_address}, `}
+            {delivery.suburb || ""} {delivery.postcode || ""}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className="px-3 py-1 rounded-full text-xs font-bold text-white"
+                style={{ background: type === "collection" ? "#8B5CF6" : "#07324C" }}>
+            {type === "collection" ? "COLLECT" : "DELIVER"}
+          </span>
+          <span className="px-2 py-0.5 rounded text-xs font-semibold"
+                style={{ background: status === "delivered" ? "#D1FAE5" : status === "loaded" ? "#DBEAFE" : status === "in_transit" ? "#D1FAE5" : "#F3F4F6",
+                         color: status === "delivered" ? "#065F46" : status === "loaded" ? "#1E40AF" : status === "in_transit" ? "#065F46" : "#6B7280" }}>
+            {status.toUpperCase().replace("_", " ")}
+          </span>
+        </div>
+      </div>
+
+      {/* Order info */}
+      <div className="text-base text-gray-700 mb-1">
+        <span className="font-semibold">Order:</span> {delivery.order_number || "—"}
+      </div>
+
+      {/* Items/SKUs */}
+      {delivery.items && delivery.items.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {delivery.items.map((item, i) => (
+            <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+              <span className="font-mono font-semibold text-navy">{item.sku_code || item.product_name}</span>
+              <span className="font-bold">{item.quantity} units</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+        <span className="text-base text-gray-500">
+          {delivery.total_qty || 0} total units
+        </span>
+        <span className="text-base font-semibold text-navy">
+          ~{delivery.estimated_travel_minutes || delivery.estimated_minutes || 30} min
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE HISTORY
+// ═══════════════════════════════════════════════════════════════
+const StageHistory = ({ stages }) => {
+  if (!stages || stages.length === 0) return null;
+  return (
+    <div className="px-4 mb-4">
+      <h3 className="text-base font-bold text-gray-500 uppercase tracking-wider mb-2">Stage History</h3>
+      <div className="space-y-1">
+        {stages.map((s, i) => (
+          <div key={i} className={`flex items-center justify-between bg-white rounded-lg px-4 py-3 ${STAGE_BAR_CLASS(s.stage)}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{s.ended_at ? "✓" : "●"}</span>
+              <span className="text-base font-medium">{STAGE_LABELS[s.stage] || s.stage}</span>
+            </div>
+            <span className="text-base font-mono font-semibold text-gray-600">
+              {s.duration_minutes ? fmtMins(s.duration_minutes) : (s.ended_at ? "—" : "active")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SHIFT SUMMARY
+// ═══════════════════════════════════════════════════════════════
+const ShiftSummary = ({ shift, stages, costs, onClose }) => {
+  const totalDriving = stages.filter(s => s.stage?.includes("driving")).reduce((a, s) => a + (s.duration_minutes || 0), 0);
+  const totalWaiting = stages.filter(s => s.stage?.includes("waiting")).reduce((a, s) => a + (s.duration_minutes || 0), 0);
+  const totalLoading = stages.filter(s => s.stage?.includes("load") || s.stage === "tie_down").reduce((a, s) => a + (s.duration_minutes || 0), 0);
+  const totalBreak = stages.filter(s => s.stage === "break").reduce((a, s) => a + (s.duration_minutes || 0), 0);
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+      <div className="p-6 max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-navy">Shift Summary</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl">&times;</button>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-5 mb-4">
+          <div className="text-base text-gray-500">Total Shift</div>
+          <div className="text-3xl font-bold text-navy">{shift?.total_hours ? `${shift.total_hours.toFixed(1)} hrs` : "—"}</div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-green-50 rounded-xl p-4">
+            <div className="text-sm text-green-600">Driving</div>
+            <div className="text-xl font-bold text-green-800">{fmtMins(totalDriving)}</div>
+          </div>
+          <div className="bg-blue-50 rounded-xl p-4">
+            <div className="text-sm text-blue-600">Loading/Unloading</div>
+            <div className="text-xl font-bold text-blue-800">{fmtMins(totalLoading)}</div>
+          </div>
+          <div className="bg-amber-50 rounded-xl p-4">
+            <div className="text-sm text-amber-600">Waiting</div>
+            <div className="text-xl font-bold text-amber-800">{fmtMins(totalWaiting)}</div>
+          </div>
+          <div className="bg-gray-100 rounded-xl p-4">
+            <div className="text-sm text-gray-500">Breaks</div>
+            <div className="text-xl font-bold text-gray-700">{fmtMins(totalBreak)}</div>
+          </div>
+        </div>
+
+        {costs && costs.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-bold text-navy mb-3">Run Costs</h3>
+            {costs.map((c, i) => (
+              <div key={i} className="bg-white rounded-xl border p-4 mb-2">
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">Driver</span>
+                  <span className="font-semibold">${c.driver_cost?.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">Fuel</span>
+                  <span className="font-semibold">${c.fuel_cost?.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">Rego + Ins</span>
+                  <span className="font-semibold">${((c.rego_cost || 0) + (c.insurance_cost || 0)).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">R&M + Tyres</span>
+                  <span className="font-semibold">${((c.rm_cost || 0) + (c.tyre_cost || 0)).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-200 mt-2">
+                  <span className="font-bold text-navy">Total</span>
+                  <span className="font-bold text-navy text-lg">${c.total_cost?.toFixed(2)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN DRIVER APP
+// ═══════════════════════════════════════════════════════════════
+const DriverApp = ({ user, token, shift, onClockOff }) => {
+  const [tab, setTab] = useState("current");
+  const [deliveries, setDeliveries] = useState([]);
+  const [upcoming, setUpcoming] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeDeliveryIdx, setActiveDeliveryIdx] = useState(0);
+  const [currentStage, setCurrentStage] = useState(null);
+  const [currentStageId, setCurrentStageId] = useState(null);
+  const [stageStartedAt, setStageStartedAt] = useState(null);
+  const [allStages, setAllStages] = useState([]);
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [breakStageId, setBreakStageId] = useState(null);
+  const [pausedStage, setPausedStage] = useState(null);
+  const [pausedStageId, setPausedStageId] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [showRunSheet, setShowRunSheet] = useState(false);
+  const [showIncident, setShowIncident] = useState(false);
+  const [shiftCosts, setShiftCosts] = useState([]);
+  const [stopNumber, setStopNumber] = useState(1);
+
+  const loadData = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const data = await api(`/driver/load?truck_id=${shift.truck_id}&date=${today}`, {}, token);
+      setDeliveries(data || []);
+      const upcoming_data = await api(`/driver/upcoming?truck_id=${shift.truck_id}&date=${today}`, {}, token);
+      setUpcoming(upcoming_data || []);
+      // Load all stages for this shift
+      const stageData = await api(`/driver/stages?shift_id=${shift.id}`, {}, token);
+      setAllStages(stageData || []);
+      // FIX 12: Find the MOST RECENT open stage (not the first one) to correctly restore break state
+      const openStages = (stageData || []).filter(s => !s.ended_at);
+      const active = openStages.length > 0
+        ? openStages.reduce((latest, s) => !latest || s.started_at > latest.started_at ? s : latest, null)
+        : null;
+      if (active) {
+        if (active.stage === "break") {
+          setIsOnBreak(true);
+          setBreakStageId(active.id);
+          setStageStartedAt(active.started_at);
+        } else {
+          setCurrentStage(active.stage);
+          setCurrentStageId(active.id);
+          setStageStartedAt(active.started_at);
+        }
+      }
+    } catch (e) {
+      console.error("Load error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [shift, token]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Determine the active delivery (first non-delivered)
+  const activeDelivery = deliveries.find(d => d.status !== "delivered" && d.status !== "collected") || deliveries[activeDeliveryIdx];
+  const deliveryType = activeDelivery?.delivery_type || activeDelivery?.order_delivery_type || "delivery";
+  const stages = deliveryType === "collection" ? COLLECTION_STAGES : DELIVERY_STAGES;
+
+  // Figure out next stage
+  // FIX 11: For multi-drop second stop onwards (delivery type), skip depot-loading stages
+  const effectiveStages = (() => {
+    if (deliveryType === "collection") return COLLECTION_STAGES;
+    if (stopNumber > 1) {
+      // Second+ stop: truck is already loaded, start from driving_to_customer
+      const skipToIdx = DELIVERY_STAGES.indexOf('driving_to_customer');
+      return skipToIdx >= 0 ? DELIVERY_STAGES.slice(skipToIdx) : DELIVERY_STAGES;
+    }
+    return DELIVERY_STAGES;
+  })();
+  const currentStageIdx = currentStage ? effectiveStages.indexOf(currentStage) : -1;
+  const nextStageIdx = currentStage ? currentStageIdx + 1 : 0;
+  const nextStage = !currentStage ? effectiveStages[0] : (nextStageIdx < effectiveStages.length ? effectiveStages[nextStageIdx] : null);
+
+  // Next action label
+  const getNextActionLabel = () => {
+    if (isOnBreak) return "End Break";
+    if (!activeDelivery) return "No deliveries";
+    if (!currentStage && nextStage) return `Start: ${STAGE_LABELS[nextStage]}`;
+    if (currentStage && nextStage) return `Next: ${STAGE_LABELS[nextStage]}`;
+    if (currentStage && !nextStage) {
+      // Check if there's another delivery
+      const nextDel = deliveries.find(d => d.id !== activeDelivery.id && d.status !== "delivered" && d.status !== "collected");
+      if (nextDel) return "Complete & Next Stop →";
+      return "Complete Delivery ✓";
+    }
+    return "Ready";
+  };
+
+  const handleNextAction = async () => {
+    // End break
+    if (isOnBreak && breakStageId) {
+      try {
+        await api("/driver/break/end", { method: "POST", body: JSON.stringify({ stage_id: breakStageId }) }, token);
+        setIsOnBreak(false);
+        setBreakStageId(null);
+        // Resume paused stage
+        if (pausedStage) {
+          setCurrentStage(pausedStage);
+          setCurrentStageId(pausedStageId);
+          setStageStartedAt(null); // Will pick up from allStages on reload
+          setPausedStage(null);
+          setPausedStageId(null);
+        }
+        toast("Break ended", "info");
+        loadData();
+      } catch (e) { toast(e.message, "error"); }
+      return;
+    }
+
+    if (!activeDelivery) return;
+    const loc = await getLocation();
+
+    // If currently in a stage, end it first
+    if (currentStageId) {
+      try {
+        await api("/driver/stage/end", { method: "POST", body: JSON.stringify({ stage_id: currentStageId }) }, token);
+      } catch (e) { toast(e.message, "error"); return; }
+    }
+
+    // If there's a next stage, start it
+    if (nextStage) {
+      try {
+        const data = await api("/driver/stage/start", {
+          method: "POST",
+          body: JSON.stringify({
+            delivery_log_id: activeDelivery.id,
+            shift_id: shift.id,
+            stage: nextStage,
+            stop_number: stopNumber,
+            lat: loc.lat,
+            lng: loc.lng,
+          }),
+        }, token);
+        setCurrentStage(nextStage);
+        setCurrentStageId(data.id);
+        setStageStartedAt(data.started_at);
+
+        // Update delivery status based on stage
+        if (nextStage === "being_loaded" || nextStage === "being_loaded_at_customer") {
+          await api("/driver/delivery/status", { method: "PUT", body: JSON.stringify({ delivery_log_id: activeDelivery.id, status: "loaded" }) }, token);
+        } else if (nextStage === "driving_to_customer") {
+          await api("/driver/delivery/status", { method: "PUT", body: JSON.stringify({ delivery_log_id: activeDelivery.id, status: "in_transit" }) }, token);
+        } else if (nextStage === "driving_return") {
+          // FIX 14: Update status to in_transit when driving back to depot
+          await api("/driver/delivery/status", { method: "PUT", body: JSON.stringify({ delivery_log_id: activeDelivery.id, status: "in_transit" }) }, token);
+        }
+
+        toast(`${STAGE_LABELS[nextStage]}`, "success");
+      } catch (e) { toast(e.message, "error"); return; }
+    } else {
+      // Complete delivery
+      try {
+        await api("/driver/delivery/complete", {
+          method: "POST",
+          body: JSON.stringify({
+            delivery_log_id: activeDelivery.id,
+            shift_id: shift.id,
+            total_km: 0, // Will be filled from TrackMyRide in Phase 2
+            tolls: 0,
+          }),
+        }, token);
+        setCurrentStage(null);
+        setCurrentStageId(null);
+        setStageStartedAt(null);
+        toast(deliveryType === "collection" ? "Collection complete!" : "Delivery complete!", "success");
+        // Move to next delivery
+        setStopNumber(s => s + 1);
+      } catch (e) { toast(e.message, "error"); return; }
+    }
+
+    loadData();
+  };
+
+  const handleBreak = async () => {
+    if (isOnBreak) return;
+    const loc = await getLocation();
+    // Pause current stage (don't end it — just mark the break)
+    setPausedStage(currentStage);
+    setPausedStageId(currentStageId);
+    try {
+      const data = await api("/driver/break/start", {
+        method: "POST",
+        body: JSON.stringify({
+          delivery_log_id: activeDelivery?.id,
+          shift_id: shift.id,
+          lat: loc.lat,
+          lng: loc.lng,
+        }),
+      }, token);
+      setIsOnBreak(true);
+      setBreakStageId(data.id);
+      setStageStartedAt(data.started_at);
+      toast("Break started", "info");
+      loadData();
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const handleClockOff = async () => {
+    if (!confirm("End your shift and clock off?")) return;
+    // End any active stage
+    if (currentStageId) {
+      try { await api("/driver/stage/end", { method: "POST", body: JSON.stringify({ stage_id: currentStageId }) }, token); } catch {}
+    }
+    if (breakStageId) {
+      try { await api("/driver/break/end", { method: "POST", body: JSON.stringify({ stage_id: breakStageId }) }, token); } catch {}
+    }
+    try {
+      await api("/driver/clock-off", { method: "POST", body: JSON.stringify({}) }, token);
+      toast("Shift complete — drive safe!", "success");
+      onClockOff();
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const handleShowSummary = async () => {
+    try {
+      const costs = await api(`/delivery-costs?shift_id=${shift.id}`, {}, token);
+      setShiftCosts(costs || []);
+    } catch {}
+    setShowSummary(true);
+    setMenuOpen(false);
+  };
+
+  // Fatigue check
+  const shiftHours = shift?.clock_on_time ? (Date.now() - new Date(shift.clock_on_time).getTime()) / 3600000 : 0;
+  const drivingMins = allStages.filter(s => s.stage?.includes("driving")).reduce((a, s) => a + (s.duration_minutes || 0), 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-navy border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500 text-lg">Loading your run...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-navy text-white px-4 py-3 flex items-center justify-between" style={{ paddingTop: "env(safe-area-inset-top, 12px)" }}>
+        <div className="flex items-center gap-3">
+          <div style={{ width:28, height:28, background:"#ED1C24", clipPath:"polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }} />
+          <div>
+            <div className="text-base font-bold">{user.full_name} — {shift.truck_name || `Truck ${shift.truck_id}`}</div>
+            <div className="text-xs text-white/60">{shift.truck_rego} • {new Date().toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}</div>
+          </div>
+        </div>
+        <button onClick={() => setMenuOpen(true)} className="p-2 text-2xl">☰</button>
+      </div>
+
+      {/* Fatigue warnings */}
+      {drivingMins > 300 && (
+        <div className="bg-red-500 text-white px-4 py-2 text-center font-bold text-base">
+          ⚠️ 5+ hrs driving — mandatory break required
+        </div>
+      )}
+      {shiftHours > 12 && (
+        <div className="bg-amber-500 text-white px-4 py-2 text-center font-bold text-base">
+          ⚠️ 12+ hr shift — consider ending your shift
+        </div>
+      )}
+
+      {/* Timer */}
+      <TimerDisplay stage={isOnBreak ? "break" : currentStage} startedAt={stageStartedAt} isBreak={isOnBreak} />
+
+      {/* Run summary bar */}
+      <div className="bg-white px-4 py-3 flex justify-between border-b border-gray-200">
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Stops</div>
+          <div className="text-lg font-bold text-navy">{deliveries.length}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Est. Time</div>
+          <div className="text-lg font-bold text-navy">
+            {fmtMins(deliveries.reduce((a, d) => a + (d.estimated_travel_minutes || d.estimated_minutes || 30), 0))}
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Total Units</div>
+          <div className="text-lg font-bold text-navy">
+            {deliveries.reduce((a, d) => a + (d.total_qty || 0), 0)}
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-500">Done</div>
+          <div className="text-lg font-bold text-green-600">
+            {deliveries.filter(d => d.status === "delivered" || d.status === "collected").length}/{deliveries.length}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="content-scroll">
+        {/* Stage History */}
+        {allStages.length > 0 && <StageHistory stages={allStages} />}
+
+        {/* Tab content */}
+        {tab === "current" ? (
+          <div className="px-4 pb-4">
+            {deliveries.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-5xl mb-4">📦</div>
+                <p className="text-xl text-gray-500">No deliveries assigned today</p>
+                <p className="text-base text-gray-400 mt-2">Check with dispatch for your load</p>
+              </div>
+            ) : (
+              deliveries.map((d, i) => (
+                <DeliveryCard key={d.id} delivery={d}
+                              isActive={activeDelivery?.id === d.id}
+                              onTap={() => setActiveDeliveryIdx(i)} />
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="px-4 pb-4">
+            {upcoming.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-xl text-gray-500">No upcoming runs</p>
+              </div>
+            ) : (
+              upcoming.map(d => <DeliveryCard key={d.id} delivery={d} isActive={false} onTap={() => {}} />)
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Break button (floating) */}
+      {currentStage && !isOnBreak && (
+        <button onClick={handleBreak}
+                className="fixed right-4 text-white font-bold px-5 py-3 rounded-full shadow-lg text-base"
+                style={{ bottom: "148px", background: "#6B7280", zIndex: 40 }}>
+          ☕ Break
+        </button>
+      )}
+
+      {/* Next Action Button */}
+      <div className="action-btn">
+        <button onClick={handleNextAction}
+                disabled={!activeDelivery && !isOnBreak}
+                style={{ background: isOnBreak ? "#6B7280" : (currentStage && !nextStage ? "#059669" : "#07324C") }}>
+          {getNextActionLabel()}
+        </button>
+      </div>
+
+      {/* Tab bar */}
+      <div className="tab-bar">
+        <button className={tab === "current" ? "active" : ""} onClick={() => setTab("current")}>
+          📦 Current Load
+        </button>
+        <button className={tab === "upcoming" ? "active" : ""} onClick={() => setTab("upcoming")}>
+          📋 Upcoming
+        </button>
+      </div>
+
+      {/* Menu overlay */}
+      {menuOpen && (
+        <>
+          <div className="menu-overlay" onClick={() => setMenuOpen(false)} />
+          <div className="menu-panel">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-navy">Menu</h3>
+              <button onClick={() => setMenuOpen(false)} className="text-2xl text-gray-400">&times;</button>
+            </div>
+            <div className="menu-item" onClick={handleShowSummary}>📊 Shift Summary</div>
+            <div className="menu-item" onClick={() => { setShowRunSheet(true); setMenuOpen(false); }}>📋 Run Sheet</div>
+            <div className="menu-item" onClick={() => { setShowIncident(true); setMenuOpen(false); }}>⚠️ Report Incident</div>
+            <div className="menu-item" onClick={() => { loadData(); setMenuOpen(false); toast("Refreshed", "info"); }}>🔄 Refresh Data</div>
+            <div className="menu-item" style={{ color: "#ED1C24" }} onClick={handleClockOff}>🔴 Clock Off</div>
+          </div>
+        </>
+      )}
+
+      {/* Shift Summary Modal */}
+      {showSummary && (
+        <ShiftSummary shift={shift} stages={allStages} costs={shiftCosts} onClose={() => setShowSummary(false)} />
+      )}
+
+      {/* Run Sheet Modal */}
+      {showRunSheet && (
+        <RunSheetView shift={shift} token={token} onClose={() => setShowRunSheet(false)} />
+      )}
+
+      {/* Incident Report Modal */}
+      {showIncident && (
+        <IncidentReport shift={shift} token={token} deliveries={deliveries} onClose={() => setShowIncident(false)} />
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// RUN SHEET VIEW
+// ═══════════════════════════════════════════════════════════════
+const RunSheetView = ({ shift, token, onClose }) => {
+  const [runSheet, setRunSheet] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const data = await api(`/driver/runsheet?truck_id=${shift.truck_id}&date=${today}`, {}, token);
+        setRunSheet(data);
+      } catch (e) {
+        console.error("Run sheet error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [shift, token]);
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div className="animate-spin w-12 h-12 border-4 border-navy border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  const stops = runSheet?.stops || [];
+  const totalMins = runSheet?.total_estimated_minutes || 0;
+  const depotTime = new Date();
+  depotTime.setHours(6, 0, 0, 0); // Assume 6am depot departure
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+      <div className="p-4 max-w-md mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-navy">Run Sheet</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl">&times;</button>
+        </div>
+
+        {/* Summary card */}
+        <div className="bg-navy text-white rounded-xl p-4 mb-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-white/60 text-sm">Truck</div>
+              <div className="text-xl font-bold">{shift.truck_name || `Truck ${shift.truck_id}`}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-white/60 text-sm">Total Stops</div>
+              <div className="text-xl font-bold">{stops.length}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-white/60 text-sm">Est. Duration</div>
+              <div className="text-xl font-bold">{fmtMins(totalMins)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Stop list */}
+        {stops.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">📋</div>
+            <p className="text-xl text-gray-500">No stops on today's run sheet</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {stops.map((stop, idx) => {
+              const type = stop.delivery_type || stop.order_delivery_type || "delivery";
+              const status = stop.status || "pending";
+              const isDone = status === "delivered" || status === "collected";
+              return (
+                <div key={stop.id || idx}
+                     className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${isDone ? "opacity-50" : ""}`}
+                     style={{ borderLeftColor: type === "collection" ? "#8B5CF6" : "#07324C" }}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg"
+                           style={{ background: isDone ? "#059669" : "#07324C" }}>
+                        {isDone ? "✓" : idx + 1}
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-navy">{stop.client_name || "Unknown"}</div>
+                        <div className="text-sm text-gray-500">
+                          {stop.street_address && `${stop.street_address}, `}
+                          {stop.suburb || ""} {stop.postcode || ""}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="px-2 py-1 rounded-full text-xs font-bold text-white"
+                          style={{ background: type === "collection" ? "#8B5CF6" : "#07324C" }}>
+                      {type === "collection" ? "COLLECT" : "DELIVER"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600 mt-2">
+                    <span>Order: <strong>{stop.order_number || "—"}</strong></span>
+                    <span>{stop.total_qty || 0} units</span>
+                    <span>~{fmtMins(stop.estimated_arrival_minutes || 0)} from depot</span>
+                  </div>
+                  {/* SKU list */}
+                  {stop.items && stop.items.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {stop.items.map((item, i) => (
+                        <div key={i} className="flex justify-between text-sm bg-gray-50 rounded px-2 py-1">
+                          <span className="font-mono text-navy">{item.sku_code || item.product_name}</span>
+                          <span className="font-bold">{item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// INCIDENT REPORTING
+// ═══════════════════════════════════════════════════════════════
+const INCIDENT_TYPES = [
+  { value: "vehicle_damage", label: "Vehicle Damage" },
+  { value: "product_damage", label: "Product Damage" },
+  { value: "road_incident", label: "Road Incident" },
+  { value: "customer_issue", label: "Customer Issue" },
+  { value: "safety_concern", label: "Safety Concern" },
+  { value: "near_miss", label: "Near Miss" },
+  { value: "other", label: "Other" },
+];
+
+const IncidentReport = ({ shift, token, deliveries, onClose }) => {
+  const [incidentType, setIncidentType] = useState("");
+  const [description, setDescription] = useState("");
+  const [deliveryId, setDeliveryId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!incidentType || !description.trim()) {
+      toast("Select type and add description", "error");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const loc = await getLocation();
+      await api("/driver/incident", {
+        method: "POST",
+        body: JSON.stringify({
+          shift_id: shift.id,
+          delivery_log_id: deliveryId || null,
+          incident_type: incidentType,
+          description: description.trim(),
+          lat: loc.lat,
+          lng: loc.lng,
+        }),
+      }, token);
+      setSubmitted(true);
+      toast("Incident reported", "success");
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div className="text-center p-6">
+          <div className="text-6xl mb-4">✓</div>
+          <h2 className="text-2xl font-bold text-navy mb-2">Incident Reported</h2>
+          <p className="text-gray-500 mb-6">Management has been notified. Stay safe.</p>
+          <button onClick={onClose}
+                  className="px-8 py-4 rounded-xl text-white font-bold text-lg"
+                  style={{ background: "#07324C" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+      <div className="p-4 max-w-md mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-navy">Report Incident</h2>
+          <button onClick={onClose} className="text-gray-400 text-3xl">&times;</button>
+        </div>
+
+        {/* Incident type */}
+        <label className="block text-base font-semibold text-navy mb-2">Incident Type *</label>
+        <div className="space-y-2 mb-5">
+          {INCIDENT_TYPES.map(t => (
+            <button key={t.value}
+                    onClick={() => setIncidentType(t.value)}
+                    className="w-full p-4 rounded-xl text-left text-lg font-medium transition-all"
+                    style={{ border: incidentType === t.value ? "3px solid #07324C" : "2px solid #E5E7EB",
+                             background: incidentType === t.value ? "#F0F7FF" : "white",
+                             color: "#07324C" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Link to delivery (optional) */}
+        {deliveries && deliveries.length > 0 && (
+          <div className="mb-5">
+            <label className="block text-base font-semibold text-navy mb-2">Related Delivery (optional)</label>
+            <select value={deliveryId} onChange={e => setDeliveryId(e.target.value)}
+                    className="w-full p-4 rounded-xl border-2 border-gray-200 text-lg text-navy"
+                    style={{ background: "white" }}>
+              <option value="">— None —</option>
+              {deliveries.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.client_name || d.order_number || `Stop #${d.id}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Description */}
+        <label className="block text-base font-semibold text-navy mb-2">Description *</label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)}
+                  rows={5} placeholder="Describe what happened..."
+                  className="w-full p-4 rounded-xl border-2 border-gray-200 text-lg text-navy mb-6"
+                  style={{ resize: "vertical", minHeight: "120px" }} />
+
+        {/* Submit */}
+        <button onClick={handleSubmit} disabled={submitting || !incidentType || !description.trim()}
+                className="w-full py-5 rounded-2xl text-xl font-bold text-white transition-all"
+                style={{ background: (incidentType && description.trim()) ? "#ED1C24" : "#D1D5DB" }}>
+          {submitting ? "Submitting..." : "Submit Incident Report"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// APP ROOT
+// ═══════════════════════════════════════════════════════════════
+const App = () => {
+  const [screen, setScreen] = useState("login"); // login | safety | truck | app
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [defaultTruck, setDefaultTruck] = useState(null);
+  const [trucks, setTrucks] = useState([]);
+  const [shift, setShift] = useState(null);
+  const [clockLoading, setClockLoading] = useState(false);
+  const [safetyChecks, setSafetyChecks] = useState({});
+
+  // Check for existing session
+  useEffect(() => {
+    const saved = localStorage.getItem("driver_session");
+    if (saved) {
+      try {
+        const s = JSON.parse(saved);
+        setToken(s.token);
+        setUser(s.user);
+        // Check for active shift
+        api("/driver/shift", {}, s.token).then(data => {
+          if (data) {
+            setShift(data);
+            setScreen("app");
+          } else {
+            loadTrucks(s.token);
+            setScreen("safety");
+          }
+        }).catch(() => {
+          localStorage.removeItem("driver_session");
+        });
+      } catch {
+        localStorage.removeItem("driver_session");
+      }
+    }
+  }, []);
+
+  const loadTrucks = async (tok) => {
+    try {
+      const data = await api("/driver/trucks", {}, tok);
+      setTrucks(data || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleLogin = (data) => {
+    setToken(data.token);
+    setUser(data.user);
+    setDefaultTruck(data.default_truck || null);
+    localStorage.setItem("driver_session", JSON.stringify({ token: data.token, user: data.user }));
+
+    // Check for active shift
+    api("/driver/shift", {}, data.token).then(shiftData => {
+      if (shiftData) {
+        setShift(shiftData);
+        setScreen("app");
+      } else {
+        loadTrucks(data.token);
+        setScreen("safety");
+      }
+    }).catch(() => {
+      loadTrucks(data.token);
+      setScreen("safety");
+    });
+  };
+
+  const handleSafetyConfirm = (checks) => {
+    setSafetyChecks(checks);
+    setScreen("truck");
+  };
+
+  const handleTruckSelect = async (truckId) => {
+    setClockLoading(true);
+    try {
+      const data = await api("/driver/clock-on", {
+        method: "POST",
+        body: JSON.stringify({ truck_id: truckId, safety_checks: safetyChecks }),
+      }, token);
+      // Get full shift with truck details
+      const shiftData = await api("/driver/shift", {}, token);
+      setShift(shiftData || data);
+      setScreen("app");
+      toast("Shift started — let's go!", "success");
+    } catch (e) {
+      if (e.message.includes("Already clocked on")) {
+        const shiftData = await api("/driver/shift", {}, token);
+        setShift(shiftData);
+        setScreen("app");
+      } else {
+        toast(e.message, "error");
+      }
+    } finally {
+      setClockLoading(false);
+    }
+  };
+
+  const handleClockOff = () => {
+    localStorage.removeItem("driver_session");
+    setScreen("login");
+    setToken(null);
+    setUser(null);
+    setShift(null);
+  };
+
+  switch (screen) {
+    case "login":
+      return <PinLogin onLogin={handleLogin} />;
+    case "safety":
+      return <SafetyChecklist onConfirm={handleSafetyConfirm} driverName={user?.full_name || "Driver"} />;
+    case "truck":
+      return <TruckSelect trucks={trucks} defaultTruck={defaultTruck} onSelect={handleTruckSelect} loading={clockLoading} />;
+    case "app":
+      return <DriverApp user={user} token={token} shift={shift} onClockOff={handleClockOff} />;
+    default:
+      return <PinLogin onLogin={handleLogin} />;
+  }
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
