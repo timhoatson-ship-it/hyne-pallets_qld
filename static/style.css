@@ -1,6 +1,6 @@
-/* Hyne Pallets — Custom CSS (Tailwind supplements) */
+/* Hyne Pallets â€” Custom CSS (Tailwind supplements) */
 
-/* ── Global 2-size font bump ──────────────────────────────────── */
+/* â”€â”€ Global 2-size font bump â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 html { font-size: 16px; }
 .text-xs { font-size: 14px !important; line-height: 1.4 !important; }
 .text-sm { font-size: 16px !important; line-height: 1.5 !important; }
@@ -11,13 +11,13 @@ html { font-size: 16px; }
 .text-3xl { font-size: 30px !important; }
 .text-4xl { font-size: 36px !important; }
 
-/* ── Scrollbars ───────────────────────────────────────────────── */
+/* â”€â”€ Scrollbars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #F5F7FA; }
 ::-webkit-scrollbar-thumb { background: #ABBFC8; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #07324C; }
 
-/* ── Sidebar ──────────────────────────────────────────────────── */
+/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #sidebar {
   width: 250px;
   min-width: 250px;
@@ -35,7 +35,7 @@ html { font-size: 16px; }
 #sidebar.collapsed .nav-item { justify-content: center; padding: 12px; }
 #sidebar.collapsed .logo-area { justify-content: center; padding: 16px 0; }
 
-/* ── Logo Chevron ─────────────────────────────────────────────── */
+/* â”€â”€ Logo Chevron â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .logo-chevron {
   width: 32px;
   height: 32px;
@@ -44,7 +44,7 @@ html { font-size: 16px; }
   flex-shrink: 0;
 }
 
-/* ── Nav items ────────────────────────────────────────────────── */
+/* â”€â”€ Nav items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .nav-item {
   display: flex;
   align-items: center;
@@ -61,7 +61,7 @@ html { font-size: 16px; }
 .nav-item.active { background: rgba(171,191,200,0.25); color: #FFFFFF; }
 .nav-item svg { flex-shrink: 0; }
 
-/* ── Tables ───────────────────────────────────────────────────── */
+/* â”€â”€ Tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .hp-table { width: 100%; border-collapse: collapse; font-size: 16px; }
 .hp-table thead tr { background: #07324C; color: #FFFFFF; }
 .hp-table thead th { padding: 10px 14px; text-align: left; font-weight: 600; white-space: nowrap; }
@@ -69,7 +69,7 @@ html { font-size: 16px; }
 .hp-table tbody tr:hover { background: #EBF2F5; }
 .hp-table tbody td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; color: #374151; }
 
-/* ── Status Badges ────────────────────────────────────────────── */
+/* â”€â”€ Status Badges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
 .badge-T { background: #e5e7eb; color: #6b7280; }
 .badge-C { background: #dbeafe; color: #1d4ed8; }
@@ -80,7 +80,7 @@ html { font-size: 16px; }
 .badge-delivered { background: #cffafe; color: #155e75; }
 .badge-collected { background: #f0fdf4; color: #14532d; }
 
-/* ── Cards ────────────────────────────────────────────────────── */
+/* â”€â”€ Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .hp-card {
   background: #FFFFFF;
   border-radius: 10px;
@@ -88,7 +88,7 @@ html { font-size: 16px; }
   padding: 20px 24px;
 }
 
-/* ── Stat Cards ───────────────────────────────────────────────── */
+/* â”€â”€ Stat Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .stat-card {
   background: #FFFFFF;
   border-radius: 10px;
@@ -97,7 +97,7 @@ html { font-size: 16px; }
   border-left: 4px solid #07324C;
 }
 
-/* ── Buttons ──────────────────────────────────────────────────── */
+/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 16px; cursor: pointer; transition: all 0.15s; border: none; outline: none; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: #07324C; color: #fff; }
@@ -116,7 +116,7 @@ html { font-size: 16px; }
 .btn-lg { padding: 12px 24px; font-size: 18px; }
 .btn-xl { padding: 18px 32px; font-size: 22px; font-weight: 700; border-radius: 10px; }
 
-/* ── Form Inputs ──────────────────────────────────────────────── */
+/* â”€â”€ Form Inputs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .hp-input {
   width: 100%;
   padding: 8px 12px;
@@ -131,13 +131,13 @@ html { font-size: 16px; }
 .hp-input:focus { border-color: #07324C; box-shadow: 0 0 0 3px rgba(7,50,76,0.12); }
 .hp-label { display: block; font-size: 15px; font-weight: 600; color: #5F545C; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
 
-/* ── Tabs ─────────────────────────────────────────────────────── */
+/* â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tab-bar { display: flex; border-bottom: 2px solid #e2e8f0; gap: 0; }
 .tab-item { padding: 10px 20px; font-size: 16px; font-weight: 600; color: #5F545C; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
 .tab-item:hover { color: #07324C; }
 .tab-item.active { color: #07324C; border-bottom-color: #07324C; }
 
-/* ── Planning Board ───────────────────────────────────────────── */
+/* â”€â”€ Planning Board â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .plan-col { min-width: 140px; border-right: 1px solid #e2e8f0; }
 .plan-col:last-child { border-right: none; }
 .plan-cell { min-height: 120px; border-top: 1px solid #e2e8f0; padding: 6px; background: #fff; transition: background 0.15s; }
@@ -155,7 +155,7 @@ html { font-size: 16px; }
 .plan-item:hover { box-shadow: 0 2px 8px rgba(7,50,76,0.15); }
 .plan-item.dragging { opacity: 0.5; cursor: grabbing; }
 
-/* ── Floor / Production ───────────────────────────────────────── */
+/* â”€â”€ Floor / Production â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .floor-btn {
   height: 120px;
   min-width: 120px;
@@ -187,11 +187,11 @@ html { font-size: 16px; }
 .pause-btn:hover { border-color: #F59E0B; background: #fef3c7; color: #92400e; }
 .pause-btn.active { background: #F59E0B; color: #fff; border-color: #F59E0B; }
 
-/* ── Progress Bar ─────────────────────────────────────────────── */
+/* â”€â”€ Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .progress-bar-bg { background: #e2e8f0; border-radius: 999px; overflow: hidden; }
 .progress-bar-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; background: #22C55E; }
 
-/* ── PIN numpad ───────────────────────────────────────────────── */
+/* â”€â”€ PIN numpad â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pin-key {
   width: 72px;
   height: 72px;
@@ -212,7 +212,7 @@ html { font-size: 16px; }
 .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: #e2e8f0; transition: background 0.2s; }
 .pin-dot.filled { background: #07324C; }
 
-/* ── Loading Spinner ──────────────────────────────────────────── */
+/* â”€â”€ Loading Spinner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
   width: 28px; height: 28px;
@@ -223,7 +223,7 @@ html { font-size: 16px; }
   display: inline-block;
 }
 
-/* ── Toast notifications ──────────────────────────────────────── */
+/* â”€â”€ Toast notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
 .toast {
   padding: 12px 18px;
@@ -241,7 +241,7 @@ html { font-size: 16px; }
 .toast-info { background: #07324C; }
 .toast-warning { background: #F59E0B; }
 
-/* ── Funnel ───────────────────────────────────────────────────── */
+/* â”€â”€ Funnel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .funnel-step {
   display: flex;
   flex-direction: column;
@@ -251,7 +251,7 @@ html { font-size: 16px; }
   position: relative;
 }
 .funnel-step::after {
-  content: '→';
+  content: 'â†’';
   position: absolute;
   right: -10px;
   top: 50%;
@@ -262,17 +262,17 @@ html { font-size: 16px; }
 }
 .funnel-step:last-child::after { display: none; }
 
-/* ── Dispatch drag ────────────────────────────────────────────── */
+/* â”€â”€ Dispatch drag â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .dispatch-card { cursor: grab; }
 .dispatch-card:active { cursor: grabbing; }
 .truck-zone { min-height: 80px; border: 2px dashed #d1d5db; border-radius: 8px; padding: 8px; transition: all 0.15s; }
 .truck-zone.drag-over { border-color: #07324C; background: #EBF2F5; }
 
-/* ── Utility ──────────────────────────────────────────────────── */
+/* â”€â”€ Utility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .truncate-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .no-select { user-select: none; -webkit-user-select: none; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
 .modal { background: #fff; border-radius: 12px; padding: 28px; max-width: 560px; width: 95%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
 
-/* ── Responsive table scroll ──────────────────────────────────── */
+/* â”€â”€ Responsive table scroll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
