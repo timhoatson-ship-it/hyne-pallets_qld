@@ -1,17 +1,9 @@
 {
-  "name": "Hyne Pallets — Production",
-  "short_name": "Production",
-  "description": "Production floor tablet app",
+  "name": "Hyne Pallets - Floor",
+  "short_name": "Floor",
   "start_url": "/floor.html",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#07324C",
+  "background_color": "#ffffff",
   "theme_color": "#07324C",
-  "icons": [
-    {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%2307324C'/%3E%3Crect x='45' y='60' width='40' height='55' rx='4' fill='none' stroke='white' stroke-width='4'/%3E%3Crect x='105' y='60' width='40' height='55' rx='4' fill='none' stroke='white' stroke-width='4'/%3E%3Crect x='45' y='60' width='40' height='14' rx='4' fill='%23ED1C24'/%3E%3Crect x='105' y='60' width='40' height='14' rx='4' fill='%23ED1C24'/%3E%3Ccircle cx='65' cy='95' r='6' fill='white'/%3E%3Ccircle cx='125' cy='95' r='6' fill='white'/%3E%3Cline x1='59' y1='95' x2='71' y2='95' stroke='white' stroke-width='3'/%3E%3Cline x1='65' y1='89' x2='65' y2='101' stroke='white' stroke-width='3'/%3E%3Ctext x='96' y='155' text-anchor='middle' font-size='18' font-weight='bold' fill='white' font-family='Arial,sans-serif'%3EPRODUCTION%3C/text%3E%3C/svg%3E",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    }
-  ]
+  "icons": []
 }

@@ -64,10 +64,10 @@ html { font-size: 16px; }
 /* ── Tables ───────────────────────────────────────────────────── */
 .hp-table { width: 100%; border-collapse: collapse; font-size: 16px; }
 .hp-table thead tr { background: #07324C; color: #FFFFFF; }
-.hp-table thead th { padding: 10px 14px; text-align: left; font-weight: 600; white-space: nowrap; }
+.hp-table thead th { padding: 12px 16px; text-align: left; font-weight: 600; white-space: nowrap; }
 .hp-table tbody tr:nth-child(even) { background: #F5F7FA; }
 .hp-table tbody tr:hover { background: #EBF2F5; }
-.hp-table tbody td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; color: #374151; }
+.hp-table tbody td { padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #374151; }
 
 /* ── Status Badges ────────────────────────────────────────────── */
 .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
@@ -276,3 +276,83 @@ html { font-size: 16px; }
 
 /* ── Responsive table scroll ──────────────────────────────────── */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Mobile / Portrait responsive ────────────────────────────── */
+@media (max-width: 768px) {
+  /* Sidebar: fully hide when collapsed on mobile */
+  #sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  /* When sidebar IS open on mobile, overlay on top */
+  #sidebar:not(.collapsed) {
+    position: fixed;
+    z-index: 200;
+    width: 250px;
+    min-width: 250px;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+  }
+
+  /* Tighter padding on cards and main content */
+  .hp-card { padding: 14px 12px; }
+  .p-6 { padding: 12px !important; }
+  .space-y-6 > * + * { margin-top: 12px !important; }
+
+  /* Tables: smaller cells */
+  .hp-table thead th { padding: 8px 8px; font-size: 13px; }
+  .hp-table tbody td { padding: 8px 8px; font-size: 14px; }
+
+  /* Stat cards tighter */
+  .stat-card { padding: 12px; }
+
+  /* Buttons slightly smaller */
+  .btn { padding: 6px 12px; font-size: 14px; }
+  .btn-sm { padding: 4px 8px; font-size: 13px; }
+  .btn-lg { padding: 10px 18px; font-size: 16px; }
+  .btn-xl { padding: 14px 24px; font-size: 18px; }
+
+  /* Tabs scroll horizontally */
+  .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .tab-item { padding: 8px 14px; font-size: 14px; flex-shrink: 0; }
+
+  /* Modal full-width on mobile */
+  .modal { max-width: 100%; width: 100%; margin: 8px; border-radius: 10px; padding: 18px; }
+
+  /* Floor buttons adjust */
+  .floor-btn { height: 90px; min-width: 90px; font-size: 2rem; }
+
+  /* Planning board scroll */
+  .plan-col { min-width: 120px; }
+
+  /* Funnel cards stack/shrink */
+  .funnel-step { min-width: 70px; padding: 6px 4px; }
+  .funnel-step::after { font-size: 14px; right: -6px; }
+
+  /* Toast narrower */
+  .toast { max-width: 260px; font-size: 14px; padding: 10px 14px; }
+  #toast-container { top: 10px; right: 10px; }
+
+  /* Input slightly smaller */
+  .hp-input { padding: 7px 10px; font-size: 15px; }
+  .hp-label { font-size: 13px; }
+}
+
+/* Extra small screens (iPhone SE, narrow portrait) */
+@media (max-width: 400px) {
+  #sidebar:not(.collapsed) {
+    width: 220px;
+    min-width: 220px;
+  }
+  .hp-card { padding: 10px 8px; }
+  .p-6 { padding: 8px !important; }
+  .hp-table thead th { padding: 6px 4px; font-size: 12px; }
+  .hp-table tbody td { padding: 6px 4px; font-size: 13px; }
+  .floor-btn { height: 76px; min-width: 76px; font-size: 1.6rem; }
+  .pin-key { width: 60px; height: 60px; font-size: 18px; }
+}
+
+/* Desktop: hide hamburger when sidebar icon column is visible */
+@media (min-width: 769px) {
+  .mobile-menu-btn { display: none !important; }
+}

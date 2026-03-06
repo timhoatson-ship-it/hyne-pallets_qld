@@ -9,8 +9,8 @@
   <title>Hyne Pallets — Yard</title>
   <link rel="manifest" href="/manifest-receiving.json" />
   <meta name="theme-color" content="#07324C" />
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -90,7 +90,7 @@ const PinLogin = ({ onLogin }) => {
         {[1,2,3,4,5,6,7,8,9].map(d => <div key={d} className="pin-key" onClick={() => addDigit(String(d))}>{d}</div>)}
         <div />
         <div className="pin-key" onClick={() => addDigit('0')}>0</div>
-        <div className="pin-key delete" onClick={() => { setPin(''); setError(''); }}>CLR</div>
+        <div className="pin-key delete" onClick={() => { setPin(p => p.slice(0,-1)); setError(''); }}>CLR</div>
       </div>
     </div>
   );
@@ -122,8 +122,8 @@ const App = () => {
   }, []);
 
   const doRedirect = (token, user) => {
-    const params = new URLSearchParams({ _token: token, _role: user.role, _page: PAGE_KEY, _app: PAGE_KEY });
-    window.location.href = '/?' + params.toString();
+    sessionStorage.setItem('hyne_pwa_handoff', JSON.stringify({ token, role: user.role, page: PAGE_KEY, app: PAGE_KEY }));
+    window.location.href = '/?_page=' + PAGE_KEY + '&_app=' + PAGE_KEY;
   };
 
   const handleLogin = (data) => {

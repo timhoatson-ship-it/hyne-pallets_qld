@@ -6,44 +6,220 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Hyne Pallets — Production</title>
+  <title>Hyne Pallets — Production Floor</title>
   <link rel="manifest" href="/manifest-floor.json" />
   <meta name="theme-color" content="#07324C" />
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { margin:0; padding:0; background:#07324C; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; font-size:18px; color:white; min-height:100vh; }
-    .pin-dot { width:18px; height:18px; border-radius:50%; border:2px solid white; margin:0 8px; transition:all .15s; }
-    .pin-dot.filled { background:white; }
-    .pin-key { width:80px; height:80px; border-radius:50%; border:2px solid rgba(255,255,255,0.4); display:flex;
-               align-items:center; justify-content:center; font-size:28px; font-weight:600; color:white;
-               cursor:pointer; user-select:none; transition:all .1s; background:transparent; }
-    .pin-key:active { background:rgba(255,255,255,0.2); transform:scale(0.95); }
-    .pin-key.delete { border-color:#ED1C24; color:#ED1C24; font-size:16px; }
-    .pin-key.delete:active { background:#ED1C24; color:white; }
+    html { font-size: 18px; }
+    body { margin:0; padding:0; font-family:'DM Sans',system-ui,sans-serif; font-size:18px; overscroll-behavior:none; background:#F0F2F5; min-height:100vh; }
+    h1,h2,h3,h4 { font-family:'Barlow Condensed',sans-serif; }
+    button { cursor:pointer; font-family:inherit; }
+    input, textarea, select { font-family:inherit; }
+
+    /* PIN screen */
+    .pin-dot { width:20px; height:20px; border-radius:50%; border:2.5px solid rgba(255,255,255,0.5); margin:0 10px; transition:all .15s; }
+    .pin-dot.filled { background:white; border-color:white; }
+    .pin-dot.error { border-color:#ED1C24; }
+    .pin-key { width:90px; height:90px; border-radius:50%; border:2px solid rgba(255,255,255,0.35); display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-size:34px; font-weight:700; color:white; user-select:none; transition:all .1s; background:rgba(255,255,255,0.08); }
+    .pin-key:active { background:rgba(255,255,255,0.25); transform:scale(0.93); }
+    .pin-key.del { border-color:rgba(237,28,36,0.6); color:#ED1C24; font-size:18px; font-family:'DM Sans',sans-serif; font-weight:700; }
+    .pin-key.del:active { background:rgba(237,28,36,0.2); }
+
+    /* Zone/Station cards */
+    .zone-card { background:white; border-radius:20px; padding:28px 20px; text-align:center; border:3px solid transparent; transition:all .15s; box-shadow:0 2px 8px rgba(0,0,0,.08); cursor:pointer; user-select:none; }
+    .zone-card:active { transform:scale(0.97); }
+    .zone-card.selected { border-color:#07324C; background:#EBF4F9; }
+
+    /* Topbar */
+    .topbar { background:#07324C; color:white; padding:0 16px; display:flex; align-items:center; gap:12px; height:64px; flex-shrink:0; position:sticky; top:0; z-index:50; }
+
+    /* Tab bar */
+    .tab-btn { flex:1; padding:16px 0 14px; text-align:center; border:none; background:none; font-size:18px; font-weight:600; color:#9CA3AF; cursor:pointer; border-bottom:3px solid transparent; transition:all .15s; }
+    .tab-btn.active { color:#07324C; border-bottom-color:#07324C; }
+
+    /* WO card */
+    .wo-card { background:white; border-radius:16px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.07); border-left:6px solid #07324C; margin-bottom:14px; }
+    .wo-card.manual { border-left-color:#6366F1; }
+    .wo-card.setup { border-left-color:#F59E0B; }
+
+    /* Status badges */
+    .badge { display:inline-block; padding:5px 12px; border-radius:20px; font-size:15px; font-weight:700; }
+    .badge-green { background:#D1FAE5; color:#065F46; }
+    .badge-amber { background:#FEF3C7; color:#92400E; }
+    .badge-red { background:#FEE2E2; color:#991B1B; }
+    .badge-blue { background:#DBEAFE; color:#1E40AF; }
+    .badge-navy { background:#07324C; color:white; }
+
+    /* Pallet counter */
+    .pallet-count { font-family:'Barlow Condensed',sans-serif; font-size:100px; font-weight:900; line-height:1; color:#07324C; }
+    .counter-btn { height:90px; border-radius:16px; font-family:'Barlow Condensed',sans-serif; font-size:38px; font-weight:800; border:none; color:white; user-select:none; transition:all .1s; display:flex; align-items:center; justify-content:center; }
+    .counter-btn:active { transform:scale(0.95); opacity:0.88; }
+    .counter-btn.minus { background:#6B7280; }
+    .counter-btn.plus { background:#07324C; }
+    .counter-btn.plus10 { background:#0A4A6E; font-size:30px; }
+
+    /* Progress bar */
+    .progress-bar-track { background:#E5E7EB; border-radius:999px; height:22px; overflow:hidden; }
+    .progress-bar-fill { height:100%; border-radius:999px; transition:width .4s ease; }
+
+    /* Action buttons */
+    .action-btn { border:none; border-radius:16px; font-family:'DM Sans',sans-serif; font-size:20px; font-weight:700; padding:20px 16px; color:white; user-select:none; transition:all .1s; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .action-btn:active { transform:scale(0.97); opacity:0.9; }
+    .action-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* Pause reason grid */
+    .pause-btn { background:white; border:2.5px solid #E5E7EB; border-radius:16px; padding:20px 12px; text-align:center; font-size:17px; font-weight:600; color:#07324C; cursor:pointer; user-select:none; transition:all .12s; }
+    .pause-btn:active { background:#EBF4F9; border-color:#07324C; transform:scale(0.97); }
+
+    /* QA alert bar */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.55} }
+    .qa-bar { background:#F59E0B; color:white; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; border-radius:14px; animation:pulse 1.8s ease-in-out infinite; }
+
+    /* Modal backdrop */
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:200; display:flex; align-items:flex-end; }
+    .modal-sheet { background:white; border-radius:28px 28px 0 0; padding:32px 20px 44px; width:100%; max-height:92vh; overflow-y:auto; }
+    .modal-center-bg { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .modal-card { background:white; border-radius:24px; padding:32px 24px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; }
+
+    /* Scrollable content */
+    .content-area { overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:100px; }
+
+    /* SKU search */
+    .sku-input { width:100%; padding:16px 18px; border-radius:14px; border:2.5px solid #E5E7EB; font-size:18px; outline:none; transition:border-color .15s; }
+    .sku-input:focus { border-color:#07324C; }
+    .sku-dropdown { position:absolute; top:100%; left:0; right:0; background:white; border-radius:0 0 14px 14px; box-shadow:0 8px 24px rgba(0,0,0,.15); z-index:100; max-height:240px; overflow-y:auto; }
+    .sku-option { padding:14px 18px; font-size:17px; cursor:pointer; border-bottom:1px solid #F3F4F6; }
+    .sku-option:active { background:#EBF4F9; }
+
+    /* Drawing viewer */
+    .drawing-img { width:100%; border-radius:14px; margin-bottom:12px; }
+
+    /* Stats grid */
+    .stat-card { background:white; border-radius:16px; padding:20px 16px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+    .stat-val { font-family:'Barlow Condensed',sans-serif; font-size:44px; font-weight:800; color:#07324C; line-height:1; }
+    .stat-lbl { font-size:15px; color:#6B7280; margin-top:4px; font-weight:500; }
+
+    /* Worker chip */
+    .worker-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:#EBF4F9; border-radius:999px; font-size:16px; font-weight:600; color:#07324C; }
+
+    /* Topbar clock */
+    .topbar-clock { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:700; color:rgba(255,255,255,0.9); letter-spacing:0.04em; }
+
+    /* Toast */
+    .toast-wrap { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+    .toast { padding:14px 22px; border-radius:12px; color:white; font-size:17px; font-weight:600; min-width:260px; text-align:center; box-shadow:0 4px 16px rgba(0,0,0,.22); animation:slideIn .3s ease; }
+    .toast-success { background:#059669; }
+    .toast-error { background:#DC2626; }
+    .toast-info { background:#07324C; }
+    @keyframes slideIn { from{opacity:0;transform:translateY(-16px) translateX(-50%)} to{opacity:1;transform:translateY(0) translateX(-50%)} }
+
+    /* Section label */
+    .section-lbl { font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#9CA3AF; margin-bottom:10px; }
+
+    /* Summary table */
+    .sum-row { display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid #F3F4F6; font-size:18px; }
+
+    /* Pulse dot */
+    .dot-pulse { width:12px; height:12px; border-radius:50%; display:inline-block; animation:pulse 1.5s ease-in-out infinite; flex-shrink:0; }
   </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect } = React;
+<div id="toast-root" class="toast-wrap"></div>
 
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS & HELPERS
+// ═══════════════════════════════════════════════════════════════
 const API_BASE = window.location.origin + '/api';
 const SESSION_KEY = 'hyne_floor_session';
-const APP_NAME = 'PRODUCTION FLOOR';
-const PAGE_KEY = 'production';
+let QA_INTERVAL = 20;
+let LABOUR_RATE = 55;
+const ALLOWED_ROLES = ['floor_worker','executive','admin','production_manager','qa_lead'];
 
 const api = async (path, options = {}, token = null) => {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(API_BASE + path, { ...options, headers });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.json();
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = { error: text }; }
+  if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+  return data;
 };
 
-// ═══════════ PIN LOGIN ═══════════
+const fmtHMS = (sec) => {
+  const s = Math.max(0, Math.floor(sec));
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+};
+
+const fmtClock = () => {
+  const n = new Date();
+  return n.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
+};
+
+const toast = (msg, type='info') => {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  const root = document.getElementById('toast-root');
+  if (root) root.appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+};
+
+const ZONES_FALLBACK = [
+  { id:1, name:'Viking', icon:'⚒️', color:'#07324C' },
+  { id:2, name:'Handmade', icon:'🪵', color:'#8B5CF6' },
+  { id:3, name:'DTL', icon:'🏭', color:'#2563EB' },
+  { id:4, name:'Crates', icon:'📦', color:'#D97706' },
+];
+
+const PAUSE_REASONS = [
+  { key:'wait_material', label:'Wait on Material', icon:'📦' },
+  { key:'tool_breakdown', label:'Tool Breakdown', icon:'🔧' },
+  { key:'machine_fault', label:'Machine Fault', icon:'⚙️' },
+  { key:'lunch', label:'Lunch', icon:'🍽️' },
+  { key:'smoko_break', label:'Smoko / Break', icon:'☕' },
+  { key:'qa_hold', label:'QA Hold', icon:'🔍' },
+  { key:'waiting_instructions', label:'Waiting Instructions', icon:'📋' },
+  { key:'other', label:'Other', icon:'❓' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// LIVE CLOCK HOOK
+// ═══════════════════════════════════════════════════════════════
+const useClock = () => {
+  const [time, setTime] = useState(fmtClock());
+  useEffect(()=>{ const id=setInterval(()=>setTime(fmtClock()),1000); return()=>clearInterval(id); },[]);
+  return time;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ELAPSED TIMER HOOK
+// ═══════════════════════════════════════════════════════════════
+const useElapsed = (startISO) => {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(()=>{
+    if (!startISO) { setElapsed(0); return; }
+    const start = new Date(startISO).getTime();
+    const tick = ()=>setElapsed(Math.floor((Date.now()-start)/1000));
+    tick();
+    const id = setInterval(tick,1000);
+    return ()=>clearInterval(id);
+  },[startISO]);
+  return elapsed;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 1. PIN LOGIN SCREEN
+// ═══════════════════════════════════════════════════════════════
 const PinLogin = ({ onLogin }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -51,94 +227,1323 @@ const PinLogin = ({ onLogin }) => {
 
   const addDigit = (d) => {
     if (pin.length >= 6) return;
-    const newPin = pin + d;
-    setPin(newPin);
+    const np = pin + d;
+    setPin(np);
     setError('');
-    if (newPin.length === 6) doLogin(newPin);
+    if (np.length === 6) doLogin(np);
   };
 
   const doLogin = async (p) => {
     setLoading(true);
     try {
-      const data = await api('/driver/pin-login', { method: 'POST', body: JSON.stringify({ pin: p }) });
+      const data = await api('/driver/pin-login', { method:'POST', body:JSON.stringify({pin:p}) });
       if (data.token) {
-        // Verify this user has production floor access
-        if (data.user && (data.user.role === 'floor_worker' || data.user.role === 'executive' || data.user.role === 'admin')) {
-          onLogin(data);
+        const role = data.user?.role;
+        if (ALLOWED_ROLES.includes(role)) {
+          localStorage.setItem(SESSION_KEY, JSON.stringify({ token:data.token, user:data.user }));
+          onLogin(data.token, data.user);
         } else {
           setError('Access denied for this role'); setPin('');
         }
       } else {
         setError('Invalid PIN'); setPin('');
       }
-    } catch {
-      setError('Invalid PIN — try again'); setPin('');
-    }
+    } catch { setError('Invalid PIN — try again'); setPin(''); }
     setLoading(false);
   };
 
   return (
-    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px',background:'#07324C'}}>
-      <div style={{fontWeight:900,fontSize:'22px',letterSpacing:'0.12em',marginBottom:'4px'}}>HYNE PALLETS</div>
-      <div style={{fontSize:'15px',color:'#ABBFC8',letterSpacing:'0.08em',marginBottom:'32px'}}>{APP_NAME}</div>
-      <div style={{display:'flex',marginBottom:'24px'}}>
-        {[0,1,2,3,4,5].map(i => <div key={i} className={`pin-dot ${i < pin.length ? 'filled' : ''}`} style={{borderColor: error ? '#ED1C24' : 'white', background: i < pin.length ? 'white' : 'transparent'}} />)}
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px',background:'#07324C'}}>
+      <div style={{marginBottom:'8px',textAlign:'center'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'14px',marginBottom:'6px'}}>
+          <div style={{width:48,height:48,background:'#ED1C24',clipPath:'polygon(50% 0%,100% 50%,50% 100%,0% 50%)',flexShrink:0}} />
+          <span style={{fontFamily:'Barlow Condensed,sans-serif',fontWeight:900,fontSize:'40px',color:'white',letterSpacing:'0.08em'}}>HYNE PALLETS</span>
+        </div>
+        <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'22px',color:'rgba(255,255,255,0.55)',letterSpacing:'0.2em',fontWeight:600}}>PRODUCTION FLOOR</div>
       </div>
-      {error && <div style={{color:'#ED1C24',fontSize:'15px',marginBottom:'12px',fontWeight:600}}>{error}</div>}
-      {loading && <div style={{color:'#ABBFC8',fontSize:'15px',marginBottom:'12px'}}>Checking...</div>}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'14px',maxWidth:'280px'}}>
-        {[1,2,3,4,5,6,7,8,9].map(d => <div key={d} className="pin-key" onClick={() => addDigit(String(d))}>{d}</div>)}
+
+      <div style={{marginTop:'40px',marginBottom:'28px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        {[0,1,2,3,4,5].map(i=>(
+          <div key={i} className={`pin-dot ${i<pin.length?'filled':''} ${error?'error':''}`} />
+        ))}
+      </div>
+
+      {error && <div style={{color:'#ED1C24',fontSize:'19px',fontWeight:700,marginBottom:'14px',textAlign:'center'}}>{error}</div>}
+      {loading && <div style={{color:'rgba(255,255,255,0.6)',fontSize:'18px',marginBottom:'14px'}}>Verifying...</div>}
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'16px',maxWidth:'320px',width:'100%'}}>
+        {[1,2,3,4,5,6,7,8,9].map(d=>(
+          <div key={d} className="pin-key" onClick={()=>addDigit(String(d))}>{d}</div>
+        ))}
         <div />
-        <div className="pin-key" onClick={() => addDigit('0')}>0</div>
-        <div className="pin-key delete" onClick={() => { setPin(''); setError(''); }}>CLR</div>
+        <div className="pin-key" onClick={()=>addDigit('0')}>0</div>
+        <div className="pin-key del" onClick={()=>{setPin(p=>p.slice(0,-1));setError('');}}>CLR</div>
       </div>
     </div>
   );
 };
 
-// ═══════════ APP ═══════════
-const App = () => {
-  const [ready, setReady] = useState(false);
-  const [needLogin, setNeedLogin] = useState(false);
+// ═══════════════════════════════════════════════════════════════
+// 2. ZONE & STATION SELECTION
+// ═══════════════════════════════════════════════════════════════
+const ZoneStation = ({ token, onConfirm }) => {
+  const [zones, setZones] = useState([]);
+  const [stations, setStations] = useState([]);
+  const [zone, setZone] = useState(null);
+  const [station, setStation] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useEffect(()=>{
+    api('/zones',{},token).then(d=>setZones(Array.isArray(d)?d:ZONES_FALLBACK)).catch(()=>setZones(ZONES_FALLBACK)).finally(()=>setLoading(false));
+  },[token]);
+
+  useEffect(()=>{
+    if (!zone) { setStations([]); return; }
+    api(`/stations?zone_id=${zone.id}`,{},token).then(d=>setStations(Array.isArray(d)?d:[])).catch(()=>setStations([]));
+  },[zone, token]);
+
+  if (loading) return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#F0F2F5'}}>
+      <div style={{textAlign:'center',color:'#07324C'}}>
+        <div style={{fontSize:'22px',fontWeight:700}}>Loading zones...</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:'100vh',background:'#F0F2F5'}}>
+      <div className="topbar">
+        <div style={{flex:1,fontFamily:'Barlow Condensed,sans-serif',fontWeight:800,fontSize:'26px',letterSpacing:'0.06em'}}>HYNE PALLETS</div>
+        <div style={{fontSize:'16px',color:'rgba(255,255,255,0.65)'}}>Production Floor</div>
+      </div>
+
+      <div style={{padding:'24px 16px'}}>
+        <div className="section-lbl">Select Zone</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'28px'}}>
+          {zones.map(z=>(
+            <div key={z.id} className={`zone-card ${zone?.id===z.id?'selected':''}`} onClick={()=>{setZone(z);setStation(null);}}>
+              <div style={{fontSize:'38px',marginBottom:'8px'}}>{z.icon||'🏭'}</div>
+              <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'28px',fontWeight:800,color:'#07324C'}}>{z.name}</div>
+            </div>
+          ))}
+        </div>
+
+        {zone && (
+          <>
+            <div className="section-lbl">Select Station — {zone.name}</div>
+            {stations.length === 0 ? (
+              <div style={{padding:'24px',textAlign:'center',color:'#9CA3AF',fontSize:'18px'}}>No stations found for this zone.</div>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'28px'}}>
+                {stations.map(s=>(
+                  <div key={s.id} onClick={()=>setStation(s)}
+                    style={{background:'white',borderRadius:'16px',padding:'20px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',border:`3px solid ${station?.id===s.id?'#07324C':'transparent'}`,background:station?.id===s.id?'#EBF4F9':'white',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,.07)'}}>
+                    <div>
+                      <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'26px',fontWeight:800,color:'#07324C'}}>{s.name}</div>
+                      {s.description && <div style={{fontSize:'16px',color:'#6B7280',marginTop:'2px'}}>{s.description}</div>}
+                    </div>
+                    {station?.id===s.id && <span style={{fontSize:'28px',color:'#07324C'}}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {zone && station && (
+          <button className="action-btn" onClick={()=>onConfirm(zone,station)}
+            style={{width:'100%',background:'#07324C',fontSize:'22px'}}>
+            Continue →
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TOPBAR COMPONENT
+// ═══════════════════════════════════════════════════════════════
+const Topbar = ({ user, zone, station, sessionStart, onLogout }) => {
+  const clock = useClock();
+  const sessionElapsed = useElapsed(sessionStart);
+
+  return (
+    <div className="topbar" style={{height:'auto',padding:'10px 16px',flexWrap:'wrap',gap:'8px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'10px',flex:1,minWidth:0}}>
+        <div style={{width:32,height:32,background:'#ED1C24',clipPath:'polygon(50% 0%,100% 50%,50% 100%,0% 50%)',flexShrink:0}} />
+        <div style={{overflow:'hidden'}}>
+          <div style={{fontFamily:'Barlow Condensed,sans-serif',fontWeight:800,fontSize:'22px',letterSpacing:'0.05em',whiteSpace:'nowrap'}}>HYNE PALLETS</div>
+          <div style={{fontSize:'14px',color:'rgba(255,255,255,0.65)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+            {zone?.name} › {station?.name}
+          </div>
+        </div>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
+        <div style={{textAlign:'right'}}>
+          <div className="topbar-clock">{clock}</div>
+          <div style={{fontSize:'13px',color:'rgba(255,255,255,0.55)'}}>{fmtHMS(sessionElapsed)}</div>
+        </div>
+        <button onClick={onLogout} style={{background:'rgba(237,28,36,0.8)',border:'none',borderRadius:'10px',padding:'9px 16px',color:'white',fontSize:'16px',fontWeight:700,fontFamily:'DM Sans,sans-serif'}}>
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SKU AUTOCOMPLETE
+// ═══════════════════════════════════════════════════════════════
+const SkuSearch = ({ token, zoneId, onSelect, placeholder }) => {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const tRef = useRef(null);
+
+  useEffect(()=>{
+    clearTimeout(tRef.current);
+    if (q.length < 2) { setResults([]); setOpen(false); return; }
+    tRef.current = setTimeout(async()=>{
+      try {
+        const d = await api(`/skus/search?q=${encodeURIComponent(q)}${zoneId?`&zone_id=${zoneId}`:''}`,{},token);
+        setResults(Array.isArray(d)?d:[]);
+        setOpen(true);
+      } catch { setResults([]); }
+    },300);
+  },[q]);
+
+  const pick = (sku) => {
+    setSelected(sku);
+    setQ(sku.sku_code + (sku.product_name ? ` — ${sku.product_name}` : ''));
+    setOpen(false);
+    onSelect && onSelect(sku);
+  };
+
+  return (
+    <div style={{position:'relative'}}>
+      <input className="sku-input" value={q} onChange={e=>{setQ(e.target.value);setSelected(null);onSelect&&onSelect(null);}}
+        placeholder={placeholder||'Search SKU or product name...'} />
+      {open && results.length>0 && (
+        <div className="sku-dropdown">
+          {results.map(s=>(
+            <div key={s.id||s.sku_code} className="sku-option" onClick={()=>pick(s)}>
+              <span style={{fontWeight:700,color:'#07324C'}}>{s.sku_code}</span>
+              {s.product_name && <span style={{color:'#6B7280',marginLeft:'8px'}}>{s.product_name}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 3. HOME / JOB SELECTION SCREEN
+// ═══════════════════════════════════════════════════════════════
+const HomeScreen = ({ token, user, zone, station, sessionStart, onStartJob, onStartSetup, onLogout }) => {
+  const [tab, setTab] = useState('job');
+  const [stationData, setStationData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [manualSku, setManualSku] = useState(null);
+  const [manualQty, setManualQty] = useState('');
+  const [setupDesc, setSetupDesc] = useState('');
+  const [setupSku, setSetupSku] = useState(null);
+  const [setupWo, setSetupWo] = useState(null);
+  const [drawings, setDrawings] = useState([]);
+  const [drawingsLoading, setDrawingsLoading] = useState(false);
+  const pollRef = useRef(null);
+
+  const loadData = useCallback(async()=>{
+    try {
+      const d = await api(`/production/worker-station-data?station_id=${station.id}&zone_id=${zone.id}`,{},token);
+      setStationData(d);
+      if (d.zone?.qa_interval) QA_INTERVAL = d.zone.qa_interval;
+    } catch(e){ console.warn('station data err',e); }
+    finally { setLoading(false); }
+  },[station, zone, token]);
+
+  useEffect(()=>{
+    loadData();
+    pollRef.current = setInterval(loadData, 15000);
+    return ()=>clearInterval(pollRef.current);
+  },[loadData]);
+
+  const loadDrawings = async(skuId, orderItemId)=>{
+    setDrawingsLoading(true);
+    try {
+      const params = skuId?`sku_id=${skuId}`:orderItemId?`order_item_id=${orderItemId}`:'';
+      const d = await api(`/production/drawings?${params}`,{},token);
+      setDrawings(Array.isArray(d)?d:[]);
+    } catch { setDrawings([]); }
+    finally { setDrawingsLoading(false); }
+  };
+
+  const workOrders = stationData?.scheduled_work || stationData?.work_orders || [];
+  const activeSessions = stationData?.active_sessions || [];
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',background:'#F0F2F5'}}>
+      <Topbar user={user} zone={zone} station={station} sessionStart={sessionStart} onLogout={onLogout} />
+
+      {/* Session info strip */}
+      <div style={{background:'#07324C',borderTop:'1px solid rgba(255,255,255,0.1)',padding:'8px 16px',display:'flex',gap:'16px',flexWrap:'wrap',fontSize:'15px',color:'rgba(255,255,255,0.75)'}}>
+        <span><strong style={{color:'white'}}>Zone:</strong> {zone?.name}</span>
+        <span><strong style={{color:'white'}}>Station:</strong> {station?.name}</span>
+        <span><strong style={{color:'white'}}>Worker:</strong> {user?.name||user?.username||'Floor Worker'}</span>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{background:'white',borderBottom:'2px solid #E5E7EB',display:'flex',flexShrink:0}}>
+        <button className={`tab-btn ${tab==='job'?'active':''}`} onClick={()=>setTab('job')}>Job</button>
+        <button className={`tab-btn ${tab==='specs'?'active':''}`} onClick={()=>{setTab('specs');if(workOrders[0])loadDrawings(workOrders[0].sku_id,workOrders[0].order_item_id);}}>Specifications</button>
+      </div>
+
+      <div className="content-area" style={{flex:1}}>
+        {tab==='job' && (
+          <div style={{padding:'18px 16px'}}>
+            {/* Active Jobs at This Station */}
+            {activeSessions.length > 0 && (
+              <>
+                <div className="section-lbl">Active Jobs at This Station</div>
+                {activeSessions.map(sess => (
+                  <div key={sess.id} className="wo-card" style={{borderLeftColor:'#059669'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'10px'}}>
+                      <div>
+                        <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'26px',fontWeight:800,color:'#059669'}}>
+                          {sess.status === 'active' ? '● ACTIVE' : '⏸ PAUSED'} — WO# {sess.order_number || sess.id}
+                        </div>
+                        <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'22px',fontWeight:700,color:'#374151'}}>{sess.product_name || sess.sku_code || 'Manual Job'}</div>
+                        {sess.client_name && <div style={{fontSize:'16px',color:'#6B7280',marginTop:'2px'}}>📍 {sess.client_name}</div>}
+                      </div>
+                    </div>
+                    {sess.workers && sess.workers.length > 0 && (
+                      <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
+                        {sess.workers.map((w,i) => <span key={i} className="worker-chip">👷 {w.full_name || w.username}</span>)}
+                      </div>
+                    )}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'14px'}}>
+                      <div style={{background:'#F0F2F5',borderRadius:'10px',padding:'10px 14px'}}>
+                        <div style={{fontSize:'14px',color:'#9CA3AF',fontWeight:600}}>Produced</div>
+                        <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'28px',fontWeight:800,color:'#059669'}}>{sess.produced_quantity || 0}</div>
+                      </div>
+                      <div style={{background:'#F0F2F5',borderRadius:'10px',padding:'10px 14px'}}>
+                        <div style={{fontSize:'14px',color:'#9CA3AF',fontWeight:600}}>Workers</div>
+                        <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'28px',fontWeight:800,color:'#07324C'}}>{(sess.workers||[]).length}</div>
+                      </div>
+                    </div>
+                    {(sess.workers||[]).length < 2 && (
+                      <button className="action-btn" onClick={async () => {
+                        try {
+                          await api(`/production/sessions/${sess.id}/workers`, {method:'POST',body:JSON.stringify({user_id:user.id})}, token);
+                          await api('/production/floor-event', {method:'POST',body:JSON.stringify({event_type:'worker_join_session',entity_type:'production_sessions',entity_id:sess.id,zone:zone?.name,station:station?.name})}, token);
+                          toast('Joined active job','success');
+                          onStartJob({type:'wo', wo:{...sess, order_number:sess.order_number, quantity:sess.order_qty||sess.target_quantity, produced_quantity:sess.produced_quantity, sku_code:sess.sku_code, product_name:sess.product_name, client_name:sess.client_name, order_item_id:sess.order_item_id, drawing_number:sess.drawing_number}, sessionId:sess.id});
+                        } catch(e) { toast('Could not join: ' + e.message, 'error'); }
+                      }} style={{width:'100%',background:'#059669',fontSize:'20px'}}>
+                        👷 JOIN THIS JOB (2nd Worker)
+                      </button>
+                    )}
+                    {(sess.workers||[]).length >= 2 && (
+                      <div style={{textAlign:'center',color:'#9CA3AF',fontSize:'16px',fontWeight:600,padding:'10px'}}>Station at max capacity (2 workers)</div>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
+            {/* Scheduled Work Orders */}
+            <div className="section-lbl">Scheduled Work Orders</div>
+            {loading ? (
+              <div style={{textAlign:'center',padding:'32px',color:'#9CA3AF',fontSize:'18px'}}>Loading work orders...</div>
+            ) : workOrders.length===0 ? (
+              <div style={{background:'white',borderRadius:'16px',padding:'28px',textAlign:'center',color:'#9CA3AF',fontSize:'18px',marginBottom:'24px',boxShadow:'0 2px 8px rgba(0,0,0,.07)'}}>
+                <div style={{fontSize:'36px',marginBottom:'8px'}}>📋</div>
+                No scheduled jobs for this station
+              </div>
+            ) : workOrders.map(wo=>(
+              <div key={wo.id||wo.order_number} className="wo-card">
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'10px'}}>
+                  <div>
+                    <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'26px',fontWeight:800,color:'#07324C'}}>WO# {wo.order_number||wo.id}</div>
+                    <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'22px',fontWeight:700,color:'#374151'}}>{wo.product_name||wo.sku_code}</div>
+                    {wo.client_name && <div style={{fontSize:'16px',color:'#6B7280',marginTop:'2px'}}>📍 {wo.client_name}</div>}
+                  </div>
+                  <span className="badge badge-navy" style={{fontSize:'17px',whiteSpace:'nowrap'}}>{wo.sku_code}</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'14px'}}>
+                  <div style={{background:'#F0F2F5',borderRadius:'10px',padding:'10px 14px'}}>
+                    <div style={{fontSize:'14px',color:'#9CA3AF',fontWeight:600}}>Target Qty</div>
+                    <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'28px',fontWeight:800,color:'#07324C'}}>{wo.quantity||'—'}</div>
+                  </div>
+                  <div style={{background:'#F0F2F5',borderRadius:'10px',padding:'10px 14px'}}>
+                    <div style={{fontSize:'14px',color:'#9CA3AF',fontWeight:600}}>Made So Far</div>
+                    <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'28px',fontWeight:800,color:'#059669'}}>{wo.produced_quantity||0}</div>
+                  </div>
+                </div>
+                {wo.drawing_number && (
+                  <div style={{fontSize:'16px',color:'#6B7280',marginBottom:'12px'}}>Drawing: <strong>{wo.drawing_number}</strong></div>
+                )}
+                {wo.labour_mins_per_unit && wo.quantity && (
+                  <div style={{fontSize:'16px',color:'#6B7280',marginBottom:'12px'}}>
+                    Est. labour: <strong>{((wo.labour_mins_per_unit*wo.quantity)/60).toFixed(1)}h</strong> = <strong style={{color:'#07324C'}}>${((wo.labour_mins_per_unit*wo.quantity/60)*LABOUR_RATE).toFixed(0)}</strong>
+                  </div>
+                )}
+                <button className="action-btn" onClick={()=>onStartJob({type:'wo',wo})}
+                  style={{width:'100%',background:'#07324C',fontSize:'20px'}}>
+                  ▶ START JOB
+                </button>
+              </div>
+            ))}
+
+            {/* Manual Entry */}
+            <div className="section-lbl" style={{marginTop:'8px'}}>Manual Entry</div>
+            <div style={{background:'white',borderRadius:'16px',padding:'20px',boxShadow:'0 2px 8px rgba(0,0,0,.07)',marginBottom:'14px'}}>
+              <div style={{marginBottom:'12px'}}>
+                <div style={{fontSize:'16px',fontWeight:600,color:'#374151',marginBottom:'6px'}}>SKU / Product</div>
+                <SkuSearch token={token} zoneId={zone?.id} onSelect={setManualSku} />
+              </div>
+              <div style={{marginBottom:'16px'}}>
+                <div style={{fontSize:'16px',fontWeight:600,color:'#374151',marginBottom:'6px'}}>Target Quantity</div>
+                <input type="number" inputMode="numeric" className="sku-input" value={manualQty}
+                  onChange={e=>setManualQty(e.target.value)} placeholder="e.g. 100" style={{width:'100%'}} />
+              </div>
+              <button className="action-btn" onClick={()=>onStartJob({type:'manual',sku:manualSku,qty:parseInt(manualQty)||0})}
+                disabled={!manualSku||!manualQty}
+                style={{width:'100%',background:'#6366F1',fontSize:'20px',opacity:(!manualSku||!manualQty)?0.45:1}}>
+                ▶ START MANUAL JOB
+              </button>
+            </div>
+
+            {/* Setup / Jig Timer */}
+            <div className="section-lbl">Setup / Jig Timer</div>
+            <div style={{background:'white',borderRadius:'16px',padding:'20px',boxShadow:'0 2px 8px rgba(0,0,0,.07)'}}>
+              {workOrders.length > 0 && (
+                <div style={{marginBottom:'12px'}}>
+                  <div style={{fontSize:'16px',fontWeight:600,color:'#374151',marginBottom:'6px'}}>Link to Work Order (optional)</div>
+                  <select className="sku-input" value={setupWo||''} onChange={e=>{const v=e.target.value;setSetupWo(v?workOrders.find(w=>(w.id||w.order_item_id)==Number(v)):null);}} style={{width:'100%'}}>
+                    <option value="">— No WO linked —</option>
+                    {workOrders.map(wo=><option key={wo.id||wo.order_item_id} value={wo.id||wo.order_item_id}>WO# {wo.order_number} — {wo.sku_code}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={{marginBottom:'12px'}}>
+                <div style={{fontSize:'16px',fontWeight:600,color:'#374151',marginBottom:'6px'}}>Description (optional)</div>
+                <input className="sku-input" value={setupDesc} onChange={e=>setSetupDesc(e.target.value)} placeholder="e.g. Jig setup for Viking 800" style={{width:'100%'}} />
+              </div>
+              <div style={{marginBottom:'16px'}}>
+                <div style={{fontSize:'16px',fontWeight:600,color:'#374151',marginBottom:'6px'}}>Link to SKU (optional)</div>
+                <SkuSearch token={token} zoneId={zone?.id} onSelect={setSetupSku} placeholder="Optional — link to SKU" />
+              </div>
+              <button className="action-btn" onClick={()=>onStartSetup({desc:setupDesc,sku:setupSku,wo:setupWo})}
+                style={{width:'100%',background:'#F59E0B',fontSize:'20px'}}>
+                ⏱ START SETUP TIMER
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab==='specs' && (
+          <div style={{padding:'18px 16px'}}>
+            <div className="section-lbl">Drawings & Specifications</div>
+            {workOrders.length>0 && (
+              <div style={{display:'flex',gap:'8px',marginBottom:'16px',overflowX:'auto',paddingBottom:'4px'}}>
+                {workOrders.map(wo=>(
+                  <button key={wo.id} onClick={()=>loadDrawings(wo.sku_id,wo.order_item_id)}
+                    style={{background:'#07324C',color:'white',border:'none',borderRadius:'10px',padding:'10px 18px',fontSize:'16px',fontWeight:600,whiteSpace:'nowrap'}}>
+                    {wo.sku_code||`WO#${wo.order_number}`}
+                  </button>
+                ))}
+              </div>
+            )}
+            {drawingsLoading ? (
+              <div style={{textAlign:'center',padding:'32px',color:'#9CA3AF'}}>Loading drawings...</div>
+            ) : drawings.length===0 ? (
+              <div style={{background:'white',borderRadius:'16px',padding:'32px',textAlign:'center',color:'#9CA3AF',fontSize:'18px'}}>
+                <div style={{fontSize:'36px',marginBottom:'8px'}}>📐</div>
+                No drawings found. Select a work order above.
+              </div>
+            ) : drawings.map((d,i)=>(
+              <div key={i} style={{background:'white',borderRadius:'16px',padding:'16px',marginBottom:'14px',boxShadow:'0 2px 8px rgba(0,0,0,.07)'}}>
+                <div style={{fontWeight:700,fontSize:'18px',color:'#07324C',marginBottom:'8px'}}>{d.filename||d.file_name||`Drawing ${i+1}`}</div>
+                {d.file_type==='image'||/\.(jpg|jpeg|png|gif|webp)/i.test(d.file_name||d.filename||'') ? (
+                  <img src={d.url||d.file_url||`/api/production/drawings/${d.id}`} alt={d.filename} className="drawing-img" />
+                ) : (
+                  <embed src={d.url||d.file_url||`/api/production/drawings/${d.id}`} type="application/pdf"
+                    style={{width:'100%',height:'480px',borderRadius:'10px',border:'1px solid #E5E7EB'}} />
+                )}
+              </div>
+            ))}
+            {(['admin','production_manager','executive'].includes(user?.role)) && (
+              <div style={{background:'#F9FAFB',borderRadius:'16px',padding:'20px',border:'2px dashed #E5E7EB',textAlign:'center',marginTop:'8px'}}>
+                <div style={{fontSize:'17px',color:'#6B7280',marginBottom:'12px'}}>Upload Drawing / Spec</div>
+                <input type="file" accept=".pdf,image/*" id="draw-upload" style={{display:'none'}}
+                  onChange={async e=>{
+                    const f=e.target.files[0]; if(!f) return;
+                    const reader=new FileReader();
+                    reader.onload=async ev=>{
+                      try{
+                        await api('/production/drawings',{method:'POST',body:JSON.stringify({file_data:ev.target.result,file_name:f.name,file_type:f.type.startsWith('image/')?'image':'pdf',sku_id:workOrders[0]?.sku_id})},token);
+                        toast('Drawing uploaded','success');
+                        if(workOrders[0]) loadDrawings(workOrders[0].sku_id,workOrders[0].order_item_id);
+                      }catch(err){toast(err.message,'error');}
+                    };
+                    reader.readAsDataURL(f);
+                  }} />
+                <label htmlFor="draw-upload" style={{background:'#07324C',color:'white',borderRadius:'12px',padding:'12px 24px',fontSize:'17px',fontWeight:700,cursor:'pointer',display:'inline-block'}}>
+                  📎 Upload File
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SETUP TIMER SCREEN
+// ═══════════════════════════════════════════════════════════════
+const SetupTimerScreen = ({ token, user, zone, station, sessionStart, setupInfo, onFinishSetup, onStartJobFromSetup, onLogout }) => {
+  const [setupStart] = useState(new Date().toISOString());
+  const elapsed = useElapsed(setupStart);
+  const [sessionId, setSessionId] = useState(null);
+  const [started, setStarted] = useState(false);
+
+  useEffect(()=>{
+    const begin = async()=>{
+      try {
+        const d = await api('/setup',{method:'POST',body:JSON.stringify({
+          station_id:station.id, order_item_id:setupInfo.wo?.order_item_id||setupInfo.sku?.order_item_id||null,
+          setup_type:zone?.name==='Viking'?'machine_setup':'jig_setup',
+          notes:setupInfo.desc||'Setup'
+        })},token);
+        setSessionId(d.id);
+        setStarted(true);
+        api('/production/floor-event',{method:'POST',body:JSON.stringify({event_type:'setup_started',entity_type:'setup_logs',entity_id:d.id,zone:zone?.name,station:station?.name,description:setupInfo.desc})},token).catch(()=>{});
+      } catch(e){ toast('Could not start setup: '+e.message,'error'); }
+    };
+    begin();
+  },[]);
+
+  const complete = async(startJob)=>{
+    try {
+      if (sessionId) {
+        await api(`/setup/${sessionId}/complete`,{method:'PUT',body:JSON.stringify({qa_checklist_passed:1})},token);
+      }
+    } catch(e){ toast('Failed to complete setup', 'error'); }
+    api('/production/floor-event',{method:'POST',body:JSON.stringify({event_type:'setup_completed',entity_type:'setup_logs',entity_id:sessionId,duration_seconds:elapsed,zone:zone?.name,station:station?.name})},token).catch(()=>{});
+    if (startJob) onStartJobFromSetup(sessionId);
+    else onFinishSetup(elapsed);
+  };
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',background:'#F0F2F5'}}>
+      <Topbar user={user} zone={zone} station={station} sessionStart={sessionStart} onLogout={onLogout} />
+      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+        <div style={{background:'#F59E0B',borderRadius:'20px',padding:'12px 28px',color:'white',fontFamily:'Barlow Condensed,sans-serif',fontSize:'24px',fontWeight:800,letterSpacing:'0.1em',marginBottom:'20px'}}>
+          SETUP IN PROGRESS
+        </div>
+        {setupInfo.desc && <div style={{fontSize:'20px',color:'#374151',marginBottom:'8px',textAlign:'center',fontWeight:600}}>{setupInfo.desc}</div>}
+        {setupInfo.sku && <div style={{fontSize:'17px',color:'#6B7280',marginBottom:'20px'}}>{setupInfo.sku.sku_code} — {setupInfo.sku.product_name}</div>}
+
+        <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'96px',fontWeight:900,color:'#07324C',lineHeight:1,marginBottom:'8px'}}>
+          {fmtHMS(elapsed)}
+        </div>
+        <div style={{fontSize:'18px',color:'#9CA3AF',marginBottom:'40px'}}>Elapsed time</div>
+
+        <div style={{width:'100%',maxWidth:'480px',display:'flex',flexDirection:'column',gap:'14px'}}>
+          <button className="action-btn" onClick={()=>complete(true)}
+            style={{background:'#07324C',fontSize:'22px',padding:'24px'}}>
+            ✓ Complete Setup → Start Job
+          </button>
+          <button className="action-btn" onClick={()=>complete(false)}
+            style={{background:'#6B7280',fontSize:'20px'}}>
+            Complete Setup (no job)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 4. ACTIVE JOB SCREEN
+// ═══════════════════════════════════════════════════════════════
+const ActiveJobScreen = ({ token, user, zone, station, sessionStart, jobInfo, onPause, onComplete, onSwitchSku, onLogout }) => {
+  const [session, setSession] = useState(null);
+  const [sessionId, setSessionId] = useState(jobInfo.sessionId||null);
+  const [pallets, setPallets] = useState(0);
+  const [status, setStatus] = useState('active');
+  const [pauseStart, setPauseStart] = useState(null);
+  const [qaAlert, setQaAlert] = useState(false);
+  const [lastQaAt, setLastQaAt] = useState(0);
+  const [qaDefectModal, setQaDefectModal] = useState(false);
+  const [subAssemblyMode, setSubAssemblyMode] = useState(false);
+  const [subAssemblyCount, setSubAssemblyCount] = useState(0);
+  const [combinedProgress, setCombinedProgress] = useState(null);
+  const [starting, setStarting] = useState(!jobInfo.sessionId);
+  const pollRef = useRef(null);
+
+  const elapsed = useElapsed(session?.started_at||sessionStart);
+  const pauseElapsed = useElapsed(pauseStart);
+
+  // Start or resume session
+  useEffect(()=>{
+    if (jobInfo.sessionId) { setSessionId(jobInfo.sessionId); setStarting(false); return; }
+    const startSession = async()=>{
+      try {
+        const body = {
+          station_id: station.id, zone_id: zone.id,
+          order_item_id: jobInfo.wo?.order_item_id||null,
+          target_quantity: jobInfo.wo?.quantity||jobInfo.qty||null
+        };
+        const d = await api('/production/sessions',{method:'POST',body:JSON.stringify(body)},token);
+        setSessionId(d.id||d.session_id);
+        setSession(d);
+      } catch(e){ toast('Could not start session: '+e.message,'error'); }
+      finally { setStarting(false); }
+    };
+    startSession();
+  },[]);
+
+  // Poll session data
+  useEffect(()=>{
+    if (!sessionId) return;
+    const refresh = async()=>{
+      try {
+        const d = await api(`/production/sessions/${sessionId}`,{},token);
+        setSession(d);
+        setPallets(d.produced_quantity||0);
+        setStatus(d.status||'active');
+        if (d.status==='paused' && !pauseStart) setPauseStart(d.paused_at||new Date().toISOString());
+        if (d.status==='active') setPauseStart(null);
+        if (d.is_sub_assembly_mode) { setSubAssemblyMode(true); setSubAssemblyCount(d.sub_assembly_count||0); }
+      } catch(e){}
+    };
+    refresh();
+    pollRef.current = setInterval(refresh,15000);
+    return ()=>clearInterval(pollRef.current);
+  },[sessionId, token]);
+
+  // Combined progress
+  useEffect(()=>{
+    if (!sessionId || !jobInfo.wo?.order_item_id) return;
+    api(`/production/combined-progress/${jobInfo.wo.order_item_id}`,{},token).then(d=>setCombinedProgress(d)).catch(()=>{});
+  },[sessionId]);
+
+  // QA check logic
+  useEffect(()=>{
+    if (pallets>0 && pallets%QA_INTERVAL===0 && pallets!==lastQaAt) {
+      setQaAlert(true);
+      setLastQaAt(pallets);
+    }
+  },[pallets]);
+
+  const loggingRef = React.useRef(false);
+  const logQuantity = async(delta)=>{
+    if (!sessionId || loggingRef.current) return;
+    loggingRef.current = true;
+    const newCount = Math.max(0, pallets+delta);
+    setPallets(newCount);
+    try {
+      await api(`/production/sessions/${sessionId}/log`,{method:'PUT',body:JSON.stringify({quantity_change:delta})},token);
+    } catch(e){ setPallets(prev => Math.max(0, prev - delta)); toast('Failed to log quantity','error'); }
+    finally { loggingRef.current = false; }
+  };
+
+  const toggleSubAssembly = async()=>{
+    if (!sessionId) return;
+    const newMode = !subAssemblyMode;
+    try {
+      await api(`/production/sessions/${sessionId}/sub-assembly`,{method:'PUT',body:JSON.stringify({is_sub_assembly_mode:newMode?1:0})},token);
+      setSubAssemblyMode(newMode);
+      toast(newMode?'Sub-assembly mode ON':'Sub-assembly mode OFF','info');
+    } catch(e){ toast('Failed to toggle sub-assembly','error'); }
+  };
+
+  const logSubAssembly = async(delta)=>{
+    if (!sessionId||!subAssemblyMode) return;
+    const newCount = Math.max(0, subAssemblyCount+delta);
+    setSubAssemblyCount(newCount);
+    try {
+      await api(`/production/sessions/${sessionId}/sub-assembly-log`,{method:'PUT',body:JSON.stringify({quantity_change:delta})},token);
+    } catch(e){ setSubAssemblyCount(prev => Math.max(0, prev - delta)); toast('Failed to log sub-assembly','error'); }
+  };
+
+  const target = session?.target_quantity||jobInfo.wo?.quantity||jobInfo.qty||0;
+  const pct = target>0 ? Math.min(100, Math.round((pallets/target)*100)) : 0;
+  const barColor = pct>=100 ? '#DC2626' : pct>=80 ? '#F59E0B' : '#059669';
+  const trackStatus = pct>=100 ? 'over' : pct>=80 ? 'close' : 'on_track';
+
+  const wo = jobInfo.wo||{};
+  const sku = jobInfo.sku||{};
+
+  if (starting) return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#F0F2F5'}}>
+      <div style={{textAlign:'center',color:'#07324C'}}>
+        <div style={{fontSize:'22px',fontWeight:700,marginBottom:'8px'}}>Starting session...</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',background:'#F0F2F5'}}>
+      <Topbar user={user} zone={zone} station={station} sessionStart={session?.started_at||sessionStart} onLogout={onLogout} />
+
+      {/* Status banner */}
+      <div style={{background: status==='paused'?'#F59E0B':'#059669', padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+        <div className="dot-pulse" style={{background:'white'}} />
+        <span style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'24px',fontWeight:800,color:'white',letterSpacing:'0.08em'}}>
+          {status==='paused' ? 'PAUSED' : 'PRODUCTION ACTIVE'}
+        </span>
+        {status==='paused' && <span style={{marginLeft:'auto',color:'white',fontSize:'20px',fontFamily:'Barlow Condensed,sans-serif',fontWeight:700}}>{fmtHMS(pauseElapsed)}</span>}
+      </div>
+
+      {/* QA alert */}
+      {qaAlert && (
+        <div className="qa-bar" style={{margin:'12px 16px 0',borderRadius:'14px'}}>
+          <div>
+            <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'22px',fontWeight:800,letterSpacing:'0.05em'}}>🔍 QA CHECK DUE</div>
+            <div style={{fontSize:'16px',opacity:0.9}}>Every {QA_INTERVAL} pallets — check quality now</div>
+          </div>
+          <div style={{display:'flex',gap:'8px',flexShrink:0}}>
+            <button onClick={()=>setQaDefectModal(true)}
+              style={{background:'#ED1C24',color:'white',border:'none',borderRadius:'10px',padding:'10px 16px',fontSize:'17px',fontWeight:800,minHeight:'44px'}}>
+              QA Issue ✗
+            </button>
+            <button onClick={async()=>{
+              try {
+                await api('/production/qa-check',{method:'POST',body:JSON.stringify({session_id:sessionId,pallet_count:pallets,passed:1})},token);
+              } catch(e){ toast('QA check failed to record — please try again','error'); return; }
+              setQaAlert(false);
+            }}
+              style={{background:'white',color:'#92400E',border:'none',borderRadius:'10px',padding:'10px 16px',fontSize:'17px',fontWeight:800,minHeight:'44px'}}>
+              QA Passed ✓
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* QA Defect Modal */}
+      {qaDefectModal && (
+        <QADefectModal
+          sessionId={sessionId}
+          pallets={pallets}
+          token={token}
+          onRecorded={()=>{ setQaDefectModal(false); setQaAlert(false); }}
+          onCancel={()=>setQaDefectModal(false)}
+        />
+      )}
+
+      <div className="content-area" style={{flex:1,padding:'16px'}}>
+        {/* Job header */}
+        <div style={{background:'white',borderRadius:'16px',padding:'18px',marginBottom:'14px',boxShadow:'0 2px 8px rgba(0,0,0,.07)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'8px'}}>
+            <div>
+              {(wo.order_number||wo.id) && (
+                <div style={{fontSize:'17px',color:'#6B7280',fontWeight:600}}>WO# {wo.order_number||wo.id}</div>
+              )}
+              <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'30px',fontWeight:800,color:'#07324C',lineHeight:1.1}}>
+                {wo.product_name||sku.product_name||wo.sku_code||'Manual Job'}
+              </div>
+              {(wo.client_name||sku.customer) && <div style={{fontSize:'16px',color:'#6B7280',marginTop:'2px'}}>📍 {wo.client_name||sku.customer}</div>}
+            </div>
+            {(wo.sku_code||sku.sku_code) && <span className="badge badge-navy" style={{fontSize:'18px'}}>{wo.sku_code||sku.sku_code}</span>}
+          </div>
+          {wo.drawing_number && <div style={{fontSize:'16px',color:'#6B7280',marginTop:'8px'}}>Drawing: <strong>{wo.drawing_number}</strong></div>}
+        </div>
+
+        {/* Progress bar */}
+        {target>0 && (
+          <div style={{background:'white',borderRadius:'16px',padding:'18px',marginBottom:'14px',boxShadow:'0 2px 8px rgba(0,0,0,.07)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+              <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'22px',fontWeight:700,color:'#374151'}}>
+                Target Progress — {pct}%
+              </div>
+              <span className={`badge ${trackStatus==='on_track'?'badge-green':trackStatus==='close'?'badge-amber':'badge-red'}`}>
+                {trackStatus==='on_track'?'On Track':trackStatus==='close'?'Close to Limit':'Over Allocated'}
+              </span>
+            </div>
+            <div className="progress-bar-track">
+              <div className="progress-bar-fill" style={{width:`${pct}%`,background:barColor}} />
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',marginTop:'8px',fontSize:'17px',color:'#6B7280'}}>
+              <span>{pallets} made</span>
+              <span>Target: {target}</span>
+            </div>
+            {combinedProgress && (
+              <div style={{marginTop:'8px',fontSize:'15px',color:'#6B7280',borderTop:'1px solid #F3F4F6',paddingTop:'8px'}}>
+                Combined (all stations): <strong>{combinedProgress.total_produced||0}</strong> / {combinedProgress.total_target||target}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pallet counter */}
+        <div style={{background:'white',borderRadius:'16px',padding:'20px',marginBottom:'14px',boxShadow:'0 2px 8px rgba(0,0,0,.07)',textAlign:'center'}}>
+          <div style={{fontSize:'17px',color:'#9CA3AF',fontWeight:600,marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.08em'}}>Pallets Made</div>
+          <div className="pallet-count">{pallets}</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 2fr 1fr',gap:'12px',marginTop:'16px'}}>
+            <button className="counter-btn minus" onClick={()=>logQuantity(-1)} disabled={pallets<=0||status==='paused'}>−1</button>
+            <button className="counter-btn plus" onClick={()=>logQuantity(1)} disabled={status==='paused'}>+1</button>
+            <button className="counter-btn plus10" onClick={()=>logQuantity(10)} disabled={status==='paused'}>+10</button>
+          </div>
+        </div>
+
+        {/* Workers on job */}
+        {session?.workers && session.workers.length>0 && (
+          <div style={{marginBottom:'14px'}}>
+            <div className="section-lbl">Workers on Job</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+              {session.workers.map((w,i)=>(
+                <span key={i} className="worker-chip">👷 {w.name||w.username}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sub-assembly mode */}
+        <div style={{background:subAssemblyMode?'#EEF2FF':'white',borderRadius:'16px',padding:'16px 18px',marginBottom:'14px',boxShadow:'0 2px 8px rgba(0,0,0,.07)',border:subAssemblyMode?'2px solid #6366F1':'2px solid transparent'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <div style={{fontSize:'17px',fontWeight:700,color:'#07324C'}}>Sub-Assembly Mode</div>
+              <div style={{fontSize:'14px',color:'#6B7280',marginTop:'2px'}}>{subAssemblyMode?'Tracking sub-assembly components':'Toggle to track sub-assemblies separately'}</div>
+            </div>
+            <button onClick={toggleSubAssembly} disabled={status==='paused'}
+              style={{background:subAssemblyMode?'#6366F1':'#E5E7EB',color:subAssemblyMode?'white':'#374151',border:'none',borderRadius:'12px',padding:'10px 18px',fontSize:'16px',fontWeight:700,minHeight:'44px',cursor:'pointer'}}>
+              {subAssemblyMode?'ON':'OFF'}
+            </button>
+          </div>
+          {subAssemblyMode && (
+            <div style={{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid #C7D2FE'}}>
+              <div style={{fontSize:'15px',color:'#6B7280',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:600}}>Sub-Assembly Count</div>
+              <div style={{fontSize:'48px',fontWeight:900,color:'#6366F1',textAlign:'center',fontFamily:'Barlow Condensed,sans-serif'}}>{subAssemblyCount}</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 2fr 1fr',gap:'10px',marginTop:'10px'}}>
+                <button className="counter-btn minus" onClick={()=>logSubAssembly(-1)} disabled={subAssemblyCount<=0||status==='paused'} style={{fontSize:'18px',padding:'10px'}}>−1</button>
+                <button className="counter-btn plus" onClick={()=>logSubAssembly(1)} disabled={status==='paused'} style={{fontSize:'18px',padding:'10px',background:'#6366F1'}}>+1</button>
+                <button className="counter-btn plus10" onClick={()=>logSubAssembly(10)} disabled={status==='paused'} style={{fontSize:'18px',padding:'10px',background:'#4F46E5'}}>+10</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Timer */}
+        <div style={{background:'#07324C',borderRadius:'16px',padding:'16px 20px',marginBottom:'14px',display:'flex',justifyContent:'space-between',alignItems:'center',color:'white'}}>
+          <div style={{fontSize:'17px',color:'rgba(255,255,255,0.65)'}}>Run Time</div>
+          <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'36px',fontWeight:800,letterSpacing:'0.04em'}}>{fmtHMS(elapsed)}</div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'14px'}}>
+          <button className="action-btn" onClick={()=>onPause(sessionId)}
+            style={{background:status==='paused'?'#059669':'#F59E0B',flexDirection:'column',gap:'4px',padding:'18px 8px',fontSize:'17px'}}>
+            {status==='paused'?'▶ RESUME':'⏸ PAUSE'}
+          </button>
+          <button className="action-btn" onClick={()=>{
+            api('/production/floor-event',{method:'POST',body:JSON.stringify({event_type:'switch_sku',entity_type:'production_sessions',entity_id:sessionId,from_sku:wo.sku_code||sku.sku_code,zone:zone?.name,station:station?.name})},token).catch(()=>{});
+            onSwitchSku();
+          }}
+            style={{background:'#3B82F6',flexDirection:'column',gap:'4px',padding:'18px 8px',fontSize:'17px'}}>
+            🔄 SWITCH SKU
+          </button>
+          <button className="action-btn" onClick={()=>onComplete(sessionId)}
+            style={{background:'#059669',flexDirection:'column',gap:'4px',padding:'18px 8px',fontSize:'17px'}}>
+            ✓ COMPLETE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// QA DEFECT MODAL
+// ═══════════════════════════════════════════════════════════════
+const QADefectModal = ({ sessionId, pallets, token, onRecorded, onCancel }) => {
+  const [defectType, setDefectType] = useState(null);
+  const [quantity, setQuantity] = useState('1');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const DEFECT_TYPES = [
+    { key:'rework',  label:'Rework',  color:'#D97706', bg:'#FEF3C7', textColor:'#92400E' },
+    { key:'seconds', label:'Seconds', color:'#EA580C', bg:'#FFEDD5', textColor:'#9A3412' },
+    { key:'destroy', label:'Destroy', color:'#DC2626', bg:'#FEE2E2', textColor:'#991B1B' },
+  ];
+
+  const handleRecord = async() => {
+    if (!defectType) { toast('Select a defect type', 'error'); return; }
+    const qty = parseInt(quantity, 10);
+    if (!qty || qty < 1) { toast('Enter a valid quantity', 'error'); return; }
+    setLoading(true);
+    try {
+      // Create (or re-use) the QA inspection for this pallet count
+      const inspection = await api('/production/qa-check', {
+        method: 'POST',
+        body: JSON.stringify({ session_id: sessionId, pallet_count: pallets, passed: 0 })
+      }, token);
+      const inspectionId = inspection.id || inspection.inspection_id;
+      // Record the defect against the inspection
+      await api(`/qa/inspections/${inspectionId}/defects`, {
+        method: 'POST',
+        body: JSON.stringify({ defect_type: defectType, quantity: qty, notes: notes.trim() || undefined })
+      }, token);
+      toast(`${defectType.charAt(0).toUpperCase() + defectType.slice(1)} defect recorded (qty ${qty})`, 'success');
+      onRecorded();
+    } catch(e) {
+      toast('Failed to record defect: ' + e.message, 'error');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="modal-center-bg" onClick={onCancel}>
+      <div className="modal-card" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
+          <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'28px',fontWeight:800,color:'#07324C'}}>Record QA Issue</div>
+          <button onClick={onCancel} style={{background:'none',border:'none',fontSize:'32px',color:'#9CA3AF',lineHeight:1,cursor:'pointer'}}>×</button>
+        </div>
+
+        {/* Defect type buttons */}
+        <div style={{marginBottom:'20px'}}>
+          <div className="section-lbl" style={{marginBottom:'10px'}}>Defect Type</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}}>
+            {DEFECT_TYPES.map(dt => (
+              <button key={dt.key}
+                onClick={() => setDefectType(dt.key)}
+                style={{
+                  minHeight:'56px',
+                  borderRadius:'12px',
+                  border: `2.5px solid ${defectType === dt.key ? dt.color : '#E5E7EB'}`,
+                  background: defectType === dt.key ? dt.bg : 'white',
+                  color: defectType === dt.key ? dt.textColor : '#374151',
+                  fontFamily:'DM Sans,sans-serif',
+                  fontSize:'17px',
+                  fontWeight:700,
+                  cursor:'pointer',
+                  transition:'all .12s',
+                }}>
+                {dt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quantity */}
+        <div style={{marginBottom:'16px'}}>
+          <div className="section-lbl" style={{marginBottom:'8px'}}>Units Affected</div>
+          <input
+            type="number" inputMode="numeric" min="1"
+            className="sku-input"
+            value={quantity}
+            onChange={e => setQuantity(e.target.value)}
+            style={{width:'100%'}}
+          />
+        </div>
+
+        {/* Notes */}
+        <div style={{marginBottom:'24px'}}>
+          <div className="section-lbl" style={{marginBottom:'8px'}}>Notes <span style={{fontWeight:400,textTransform:'none',fontSize:'13px',color:'#9CA3AF'}}>(optional)</span></div>
+          <textarea
+            className="sku-input"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Describe the defect..."
+            rows={3}
+            style={{width:'100%',resize:'vertical'}}
+          />
+        </div>
+
+        {/* Action buttons */}
+        <div style={{display:'flex',gap:'12px'}}>
+          <button className="action-btn" onClick={onCancel}
+            style={{flex:1,background:'#6B7280',fontSize:'18px',padding:'16px'}}>
+            Cancel
+          </button>
+          <button className="action-btn" onClick={handleRecord} disabled={loading||!defectType}
+            style={{flex:2,background:'#ED1C24',fontSize:'18px',padding:'16px',opacity:(!defectType||loading)?0.5:1}}>
+            {loading ? 'Recording...' : '⚠ Record Defect'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 5. PAUSE MODAL
+// ═══════════════════════════════════════════════════════════════
+const PauseModal = ({ sessionId, token, currentStatus, onPaused, onResumed, onClose }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleResume = async()=>{
+    setLoading(true);
+    try {
+      await api(`/production/sessions/${sessionId}/resume`,{method:'PUT',body:JSON.stringify({})},token);
+      toast('Resumed','success');
+      onResumed();
+    } catch(e){ toast(e.message,'error'); }
+    setLoading(false);
+  };
+
+  const handlePause = async(reason)=>{
+    setLoading(true);
+    try {
+      await api(`/production/sessions/${sessionId}/pause`,{method:'PUT',body:JSON.stringify({reason})},token);
+      toast('Session paused','info');
+      onPaused(reason);
+    } catch(e){ toast(e.message,'error'); }
+    setLoading(false);
+  };
+
+  if (currentStatus==='paused') {
+    return (
+      <div className="modal-center-bg" onClick={onClose}>
+        <div className="modal-card" onClick={e=>e.stopPropagation()}>
+          <div style={{textAlign:'center',marginBottom:'24px'}}>
+            <div style={{fontSize:'48px',marginBottom:'8px'}}>⏸</div>
+            <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'32px',fontWeight:800,color:'#F59E0B'}}>JOB PAUSED</div>
+          </div>
+          <button className="action-btn" onClick={handleResume} disabled={loading}
+            style={{width:'100%',background:'#059669',fontSize:'22px',padding:'22px'}}>
+            {loading?'Resuming...':'▶ RESUME JOB'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
+          <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'30px',fontWeight:800,color:'#07324C'}}>Pause Reason</div>
+          <button onClick={onClose} style={{background:'none',border:'none',fontSize:'32px',color:'#9CA3AF',lineHeight:1}}>×</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
+          {PAUSE_REASONS.map(r=>(
+            <button key={r.key} className="pause-btn" onClick={()=>handlePause(r.key)} disabled={loading}>
+              <div style={{fontSize:'32px',marginBottom:'6px'}}>{r.icon}</div>
+              <div style={{fontSize:'17px'}}>{r.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 6. JOB SUMMARY SCREEN
+// ═══════════════════════════════════════════════════════════════
+const JobSummaryScreen = ({ token, user, zone, station, sessionId, onNextJob, onManualJob, onEndShift, onLogout }) => {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    api(`/production/session-summary/${sessionId}`,{},token)
+      .then(d=>setSummary(d))
+      .catch(()=>setSummary(null))
+      .finally(()=>setLoading(false));
+  },[sessionId]);
+
+  const labourCost = summary ? (((summary.net_run_minutes||0)/60) * LABOUR_RATE * Math.max(1,(summary.workers||[]).length)).toFixed(2) : '0.00';
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',background:'#F0F2F5'}}>
+      <div className="topbar">
+        <div style={{fontFamily:'Barlow Condensed,sans-serif',fontWeight:800,fontSize:'24px',letterSpacing:'0.06em',flex:1}}>JOB COMPLETE</div>
+        <button onClick={onLogout} style={{background:'rgba(237,28,36,0.8)',border:'none',borderRadius:'10px',padding:'9px 16px',color:'white',fontSize:'16px',fontWeight:700}}>Logout</button>
+      </div>
+
+      <div className="content-area" style={{flex:1,padding:'20px 16px'}}>
+        {/* Hero */}
+        <div style={{background:'#059669',borderRadius:'20px',padding:'28px',textAlign:'center',color:'white',marginBottom:'20px',boxShadow:'0 4px 16px rgba(5,150,105,.3)'}}>
+          <div style={{fontSize:'64px',marginBottom:'8px'}}>✓</div>
+          <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'42px',fontWeight:900,letterSpacing:'0.05em'}}>JOB COMPLETE</div>
+          {summary?.product_name && <div style={{fontSize:'20px',opacity:0.9,marginTop:'4px'}}>{summary.product_name}</div>}
+        </div>
+
+        {loading ? (
+          <div style={{textAlign:'center',padding:'32px',color:'#9CA3AF',fontSize:'18px'}}>Loading summary...</div>
+        ) : (
+          <>
+            {/* Stats grid */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'20px'}}>
+              <div className="stat-card">
+                <div className="stat-val">{summary?.produced_quantity||0}</div>
+                <div className="stat-lbl">Pallets Made</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-val" style={{fontSize:'32px'}}>{fmtHMS((summary?.net_run_minutes||0)*60)}</div>
+                <div className="stat-lbl">Net Run Time</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-val" style={{fontSize:'32px'}}>${labourCost}</div>
+                <div className="stat-lbl">Labour Cost</div>
+              </div>
+            </div>
+
+            {/* Details table */}
+            <div style={{background:'white',borderRadius:'16px',padding:'18px',marginBottom:'20px',boxShadow:'0 2px 8px rgba(0,0,0,.07)'}}>
+              <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'22px',fontWeight:700,color:'#07324C',marginBottom:'12px'}}>Job Details</div>
+              {[
+                ['Total Pause Time', fmtHMS((summary?.total_pause_minutes||0)*60)],
+                ['Gross Time', fmtHMS((summary?.gross_minutes||0)*60)],
+                ['Target Qty', summary?.target_quantity||'—'],
+                ['Variance', summary?.variance!=null ? summary.variance : '—'],
+                ['Workers', (summary?.workers||[]).length||1],
+                ['Zone / Station', `${zone?.name} › ${station?.name}`],
+              ].map(([l,v])=>(
+                <div key={l} className="sum-row">
+                  <span style={{color:'#6B7280'}}>{l}</span>
+                  <span style={{fontWeight:700,color:'#07324C'}}>{v}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Next actions */}
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <button className="action-btn" onClick={onNextJob}
+                style={{background:'#07324C',fontSize:'21px',padding:'22px'}}>
+                📋 Select Next Scheduled Job
+              </button>
+              <button className="action-btn" onClick={onManualJob}
+                style={{background:'#6366F1',fontSize:'21px',padding:'22px'}}>
+                ✏️ Start Manual Job
+              </button>
+              <button className="action-btn" onClick={onEndShift}
+                style={{background:'#DC2626',fontSize:'21px',padding:'22px'}}>
+                🏁 End Shift
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 8. SHIFT CHANGEOVER SCREEN
+// ═══════════════════════════════════════════════════════════════
+const ShiftChangeover = ({ token, zone, station, onComplete }) => {
+  const [shiftData, setShiftData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [doing, setDoing] = useState(false);
+
+  useEffect(()=>{
+    api(`/production/shift-summary?station_id=${station.id}&zone_id=${zone.id}`,{},token)
+      .then(d=>setShiftData(d)).catch(()=>setShiftData(null)).finally(()=>setLoading(false));
+  },[]);
+
+  const handleEnd = async()=>{
+    setDoing(true);
+    try {
+      await api('/production/shift-changeover',{method:'POST',body:JSON.stringify({station_id:station.id,zone_id:zone.id})},token);
+      toast('Shift ended and logged','success');
+    } catch(e){ toast('Shift end error: '+e.message,'error'); }
+    setDoing(false);
+    onComplete();
+  };
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#07324C',padding:'24px'}}>
+      <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'38px',fontWeight:900,color:'white',marginBottom:'8px',textAlign:'center'}}>SHIFT CHANGEOVER</div>
+      <div style={{fontSize:'18px',color:'rgba(255,255,255,0.65)',marginBottom:'32px',textAlign:'center'}}>{zone?.name} › {station?.name}</div>
+
+      {loading ? (
+        <div style={{color:'rgba(255,255,255,0.6)',fontSize:'18px',marginBottom:'32px'}}>Loading shift summary...</div>
+      ) : shiftData ? (
+        <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'20px',padding:'24px',width:'100%',maxWidth:'400px',marginBottom:'24px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'48px',fontWeight:900,color:'white'}}>{shiftData.sessions_closed||0}</div>
+              <div style={{fontSize:'16px',color:'rgba(255,255,255,0.65)'}}>Sessions Closed</div>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontFamily:'Barlow Condensed,sans-serif',fontSize:'36px',fontWeight:800,color:'white'}}>{fmtHMS(shiftData.total_run_seconds||0)}</div>
+              <div style={{fontSize:'16px',color:'rgba(255,255,255,0.65)'}}>Run Time</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <button className="action-btn" onClick={handleEnd} disabled={doing}
+        style={{background:'#ED1C24',fontSize:'22px',padding:'24px 40px'}}>
+        {doing ? 'Ending Shift...' : '🏁 Confirm End Shift & Log to Stock'}
+      </button>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════
+const App = () => {
+  const [screen, setScreen] = useState('login');
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [zone, setZone] = useState(null);
+  const [station, setStation] = useState(null);
+  const [sessionStart, setSessionStart] = useState(null);
+  const [jobInfo, setJobInfo] = useState(null);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sessionStatus, setSessionStatus] = useState('active');
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [completedSessionId, setCompletedSessionId] = useState(null);
+
+  // Fetch labour rate from backend on mount (fallback to 55)
+  useEffect(()=>{
+    api('/labour-config').then(d=>{
+      if (d && typeof d.default_rate === 'number') LABOUR_RATE = d.default_rate;
+    }).catch(()=>{});
+  },[]);
+
+  // Restore session on load
+  useEffect(()=>{
     const saved = localStorage.getItem(SESSION_KEY);
     if (saved) {
       try {
         const s = JSON.parse(saved);
-        api('/auth/me', {}, s.token).then(data => {
-          if (data && data.id) {
-            doRedirect(s.token, s.user);
+        if (s.token && s.user) {
+          setToken(s.token); setUser(s.user);
+          // Check if zone/station were saved too
+          if (s.zone && s.station) {
+            setZone(s.zone); setStation(s.station);
+            setSessionStart(s.sessionStart||new Date().toISOString());
+            setScreen('home');
           } else {
-            localStorage.removeItem(SESSION_KEY);
-            setNeedLogin(true);
+            setScreen('zone_select');
           }
-        }).catch(() => { localStorage.removeItem(SESSION_KEY); setNeedLogin(true); });
-      } catch { localStorage.removeItem(SESSION_KEY); setNeedLogin(true); }
-    } else {
-      setNeedLogin(true);
+        } else { setScreen('login'); }
+      } catch { setScreen('login'); }
     }
-    setReady(true);
-  }, []);
+  },[]);
 
-  const doRedirect = (token, user) => {
-    const params = new URLSearchParams({ _token: token, _role: user.role, _page: PAGE_KEY, _app: PAGE_KEY });
-    window.location.href = '/?' + params.toString();
+  const handleLogin = (tok, usr) => {
+    setToken(tok); setUser(usr); setScreen('zone_select');
+    api('/production/floor-event',{method:'POST',body:JSON.stringify({event_type:'worker_login',entity_type:'users',entity_id:usr.id})},tok).catch(()=>{});
   };
 
-  const handleLogin = (data) => {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: data.token, user: data.user }));
-    doRedirect(data.token, data.user);
+  const handleZoneStation = (z, s) => {
+    setZone(z); setStation(s);
+    const start = new Date().toISOString();
+    setSessionStart(start);
+    const saved = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+    localStorage.setItem(SESSION_KEY, JSON.stringify({...saved, zone:z, station:s, sessionStart:start}));
+    setScreen('home');
   };
 
-  if (!ready) return null;
-  if (needLogin) return <PinLogin onLogin={handleLogin} />;
-  return (
-    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#07324C'}}>
-      <div style={{fontWeight:900,fontSize:'22px',letterSpacing:'0.12em',marginBottom:'8px'}}>HYNE PALLETS</div>
-      <div style={{color:'#ABBFC8',fontSize:'16px'}}>Loading Production App...</div>
-    </div>
-  );
+  const handleStartJob = (info) => {
+    setJobInfo(info);
+    setActiveSessionId(null);
+    setSessionStatus('active');
+    setScreen('active_job');
+  };
+
+  const handleStartSetup = (info) => {
+    setJobInfo(info);
+    setScreen('setup');
+  };
+
+  const handlePause = (sid) => {
+    setActiveSessionId(sid);
+    setShowPauseModal(true);
+  };
+
+  const handleComplete = async(sid) => {
+    try {
+      await api(`/production/sessions/${sid}/complete`,{method:'PUT',body:JSON.stringify({})},token);
+      setCompletedSessionId(sid);
+      setScreen('summary');
+    } catch(e){
+      toast(e.message || 'Failed to complete session', 'error');
+    }
+  };
+
+  const handleLogout = async() => {
+    if (zone && station && token) {
+      // Trigger shift changeover screen
+      setScreen('changeover');
+    } else {
+      doLogout();
+    }
+  };
+
+  const doLogout = () => {
+    if (token) api('/production/floor-event',{method:'POST',body:JSON.stringify({event_type:'worker_logout',entity_type:'users',entity_id:user?.id,zone:zone?.name,station:station?.name})},token).catch(()=>{});
+    localStorage.removeItem(SESSION_KEY);
+    setToken(null); setUser(null); setZone(null); setStation(null);
+    setJobInfo(null); setActiveSessionId(null); setSessionStart(null);
+    setScreen('login');
+  };
+
+  const screens = {
+    login: <PinLogin onLogin={handleLogin} />,
+    zone_select: <ZoneStation token={token} onConfirm={handleZoneStation} />,
+    home: (
+      <HomeScreen
+        token={token} user={user} zone={zone} station={station}
+        sessionStart={sessionStart}
+        onStartJob={handleStartJob}
+        onStartSetup={handleStartSetup}
+        onLogout={handleLogout}
+      />
+    ),
+    setup: (
+      <SetupTimerScreen
+        token={token} user={user} zone={zone} station={station}
+        sessionStart={sessionStart} setupInfo={jobInfo||{}}
+        onFinishSetup={()=>setScreen('home')}
+        onStartJobFromSetup={(sid)=>{ setJobInfo({...jobInfo,sessionId:sid}); setScreen('active_job'); }}
+        onLogout={handleLogout}
+      />
+    ),
+    active_job: (
+      <>
+        <ActiveJobScreen
+          token={token} user={user} zone={zone} station={station}
+          sessionStart={sessionStart} jobInfo={jobInfo||{}}
+          onPause={handlePause}
+          onComplete={handleComplete}
+          onSwitchSku={()=>setScreen('home')}
+          onLogout={handleLogout}
+        />
+        {showPauseModal && (
+          <PauseModal
+            sessionId={activeSessionId}
+            token={token}
+            currentStatus={sessionStatus}
+            onPaused={(reason)=>{ setSessionStatus('paused'); setShowPauseModal(false); }}
+            onResumed={()=>{ setSessionStatus('active'); setShowPauseModal(false); }}
+            onClose={()=>setShowPauseModal(false)}
+          />
+        )}
+      </>
+    ),
+    summary: (
+      <JobSummaryScreen
+        token={token} user={user} zone={zone} station={station}
+        sessionId={completedSessionId}
+        onNextJob={()=>setScreen('home')}
+        onManualJob={()=>{ setJobInfo({type:'manual'}); setScreen('home'); }}
+        onEndShift={()=>setScreen('changeover')}
+        onLogout={handleLogout}
+      />
+    ),
+    changeover: (
+      <ShiftChangeover
+        token={token} zone={zone} station={station}
+        onComplete={doLogout}
+      />
+    ),
+  };
+
+  return screens[screen] || screens.login;
 };
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
