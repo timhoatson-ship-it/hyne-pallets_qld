@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>Hyne Pallets — Driver App</title>
   <link rel="manifest" href="/manifest-driver.json" />
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" integrity="sha384-tMH8h3BGESGckSAVGZ82T9n90ztNXxvdwvdM6UoR56cYcf+0iGXBliJ29D+wZ/x8" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" integrity="sha384-bm7MnzvK++ykSwVJ2tynSE5TRdN+xL418osEVF2DE/L/gfWHj91J2Sphe582B1Bh" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js" integrity="sha384-AISI5AuDG6E8DeEiFMVB3rGQxhZt24OU0avMp+GMV64+tpnA3+Z6F5MT0f96iPva" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -154,6 +154,7 @@ const api = async (path, options = {}, token = null) => {
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { error: text }; }
+  if (res.status === 401) { localStorage.removeItem('driver_session'); window.location.reload(); throw new Error('Session expired'); }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 };

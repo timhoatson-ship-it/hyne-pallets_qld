@@ -1531,7 +1531,7 @@ def migrate_db():
             c.execute("""
                 INSERT INTO users_new (id, email, password_hash, pin, username, full_name, role, default_zone_id, is_active, created_at, updated_at)
                 SELECT id, email, password_hash, pin, username, full_name,
-                    CASE WHEN role = 'dispatch' AND username IN ('leeroy','usef','ronny','ben','marcus','besher') THEN 'driver' ELSE role END,
+                    CASE WHEN role = 'dispatch' AND pin IS NOT NULL AND (email IS NULL OR email = '') THEN 'driver' ELSE role END,
                     default_zone_id, is_active, created_at, updated_at
                 FROM users
             """)
@@ -2395,6 +2395,7 @@ def migrate_db():
         conn.commit()
 
     # --- P1 Fix: Add kanban_status to orders/order_items if missing ---
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(orders)").fetchall()}
     if 'kanban_status' not in existing_cols:
         conn.execute("ALTER TABLE orders ADD COLUMN kanban_status TEXT")
     oi_cols3 = {row[1] for row in conn.execute("PRAGMA table_info(order_items)").fetchall()}
@@ -2408,6 +2409,37 @@ def migrate_db():
         conn.commit()
     except Exception as e:
         print(f"[migrate_db] PIN uniqueness index: {e}")
+        conn.rollback()
+
+    # --- Fix #16: Detect and resolve pre-existing PIN collisions ---
+    try:
+        collisions = conn.execute(
+            "SELECT pin, GROUP_CONCAT(username, ', ') as users, COUNT(*) as cnt "
+            "FROM users WHERE pin IS NOT NULL GROUP BY pin HAVING COUNT(*) > 1"
+        ).fetchall()
+        if collisions:
+            for c in collisions:
+                logging.warning(
+                    f"[PIN COLLISION] PIN ending '...{str(c[0])[-2:]}' shared by users: {c[1]} (count: {c[2]}). "
+                    "Admin must assign unique PINs to resolve."
+                )
+            # Auto-resolve: null out duplicate PINs (keep only the first user's PIN per collision group)
+            for c in collisions:
+                dup_users = conn.execute(
+                    "SELECT id, username FROM users WHERE pin=? ORDER BY id",
+                    [c[0]]
+                ).fetchall()
+                # Keep the first user's PIN, null out the rest
+                for dup in dup_users[1:]:
+                    conn.execute("UPDATE users SET pin=NULL WHERE id=?", [dup[0]])
+                    logging.warning(
+                        f"[PIN COLLISION FIX] Cleared duplicate PIN for user '{dup[1]}' (id={dup[0]}). "
+                        "Admin must set a new unique PIN for this user."
+                    )
+            conn.commit()
+            logging.info("[PIN COLLISION] All duplicate PINs resolved. Affected users need new PINs assigned by admin.")
+    except Exception as e:
+        logging.warning(f"[migrate_db] PIN collision check: {e}")
         conn.rollback()
 
     # --- P1 Fix: Recreate users table with expanded role CHECK if needed ---
@@ -3377,34 +3409,57 @@ def dispatch(method, path, params, body, conn):
         sql = f"SELECT o.*, c.company_name as client_name FROM orders o LEFT JOIN clients c ON c.id=o.client_id WHERE {' AND '.join(where)} ORDER BY o.created_at DESC"
         rows = conn.execute(sql, vals).fetchall()
         orders = rows_to_list(rows)
-        for o in orders:
-            cnt = conn.execute("SELECT COUNT(*), COALESCE(SUM(quantity),0), COALESCE(SUM(produced_quantity),0) FROM order_items WHERE order_id=?", [o["id"]]).fetchone()
-            o["item_count"] = cnt[0]
-            o["total_qty"] = cnt[1]
-            o["total_produced"] = cnt[2]
-            max_sched = conn.execute(
-                "SELECT MAX(scheduled_date) FROM schedule_entries WHERE order_id=? AND status!='cancelled'",
-                [o["id"]]
-            ).fetchone()
-            o["mfg_completion_date"] = max_sched[0] if max_sched and max_sched[0] else None
-            # Item-level status breakdown
-            item_rows = conn.execute(
-                "SELECT status, COUNT(*) as cnt FROM order_items WHERE order_id=? GROUP BY status",
-                [o["id"]]
-            ).fetchall()
-            breakdown = {r[0]: r[1] for r in item_rows}
-            o["item_status_breakdown"] = breakdown
-            # Compute progress from item statuses
-            total_items = cnt[0]
-            finished_items = sum(v for k, v in breakdown.items() if k in ('F', 'dispatched'))
-            o["progress"] = f"{finished_items}/{total_items} items complete" if total_items > 0 else "0/0 items complete"
-            # Add SKU codes for floor tablet display
-            sku_rows = conn.execute(
-                "SELECT DISTINCT sku_code FROM order_items WHERE order_id=? AND sku_code IS NOT NULL AND sku_code != ''",
-                [o["id"]]
-            ).fetchall()
-            o["sku_codes"] = [r[0] for r in sku_rows]
-            o["primary_sku"] = sku_rows[0][0] if sku_rows else None
+        if orders:
+            order_ids = [o["id"] for o in orders]
+            placeholders = ",".join("?" for _ in order_ids)
+
+            # Batch: item counts, total qty, total produced per order
+            item_counts = {}
+            for r in conn.execute(
+                f"SELECT order_id, COUNT(*), COALESCE(SUM(quantity),0), COALESCE(SUM(produced_quantity),0) FROM order_items WHERE order_id IN ({placeholders}) GROUP BY order_id",
+                order_ids
+            ).fetchall():
+                item_counts[r[0]] = {"item_count": r[1], "total_qty": r[2], "total_produced": r[3]}
+
+            # Batch: max scheduled_date per order
+            sched_map = {}
+            for r in conn.execute(
+                f"SELECT order_id, MAX(scheduled_date) FROM schedule_entries WHERE order_id IN ({placeholders}) AND status!='cancelled' GROUP BY order_id",
+                order_ids
+            ).fetchall():
+                sched_map[r[0]] = r[1]
+
+            # Batch: item status breakdowns per order
+            breakdown_map = {}
+            for r in conn.execute(
+                f"SELECT order_id, status, COUNT(*) as cnt FROM order_items WHERE order_id IN ({placeholders}) GROUP BY order_id, status",
+                order_ids
+            ).fetchall():
+                breakdown_map.setdefault(r[0], {})[r[1]] = r[2]
+
+            # Batch: distinct SKU codes per order
+            sku_map = {}
+            for r in conn.execute(
+                f"SELECT order_id, sku_code FROM order_items WHERE order_id IN ({placeholders}) AND sku_code IS NOT NULL AND sku_code != '' GROUP BY order_id, sku_code",
+                order_ids
+            ).fetchall():
+                sku_map.setdefault(r[0], []).append(r[1])
+
+            for o in orders:
+                oid = o["id"]
+                ic = item_counts.get(oid, {"item_count": 0, "total_qty": 0, "total_produced": 0})
+                o["item_count"] = ic["item_count"]
+                o["total_qty"] = ic["total_qty"]
+                o["total_produced"] = ic["total_produced"]
+                o["mfg_completion_date"] = sched_map.get(oid)
+                breakdown = breakdown_map.get(oid, {})
+                o["item_status_breakdown"] = breakdown
+                total_items = ic["item_count"]
+                finished_items = sum(v for k, v in breakdown.items() if k in ('F', 'dispatched'))
+                o["progress"] = f"{finished_items}/{total_items} items complete" if total_items > 0 else "0/0 items complete"
+                skus = sku_map.get(oid, [])
+                o["sku_codes"] = skus
+                o["primary_sku"] = skus[0] if skus else None
         return {"status": 200, "body": orders}
 
     if method == "POST" and path == "/orders":
@@ -3734,6 +3789,12 @@ def dispatch(method, path, params, body, conn):
         eta = body.get("eta_date")
         if not eta:
             return {"status": 400, "body": {"error": "eta_date required"}}
+        # B-046: Validate date format
+        try:
+            from datetime import datetime as _dt
+            _dt.strptime(eta, "%Y-%m-%d")
+        except Exception:
+            return {"status": 400, "body": {"error": "eta_date must be YYYY-MM-DD format"}}
         row = conn.execute("SELECT * FROM orders WHERE id=?", [oid]).fetchone()
         if not row:
             return {"status": 404, "body": {"error": "Order not found"}}
@@ -3785,6 +3846,12 @@ def dispatch(method, path, params, body, conn):
         eta = body.get("eta_date")
         if not eta:
             return {"status": 400, "body": {"error": "eta_date required"}}
+        # B-046: Validate date format
+        try:
+            from datetime import datetime as _dt
+            _dt.strptime(eta, "%Y-%m-%d")
+        except Exception:
+            return {"status": 400, "body": {"error": "eta_date must be YYYY-MM-DD format"}}
         item_row = conn.execute("SELECT * FROM order_items WHERE id=?", [iid]).fetchone()
         if not item_row:
             return {"status": 404, "body": {"error": "Order item not found"}}
@@ -4275,7 +4342,10 @@ def dispatch(method, path, params, body, conn):
             return {"status": 404, "body": {"error": "Session not found"}}
         final_qty = body.get("produced_quantity", session["produced_quantity"])
         force_complete = body.get("force_complete", False)
-        conn.execute("UPDATE production_sessions SET status='completed', end_time=CURRENT_TIMESTAMP, produced_quantity=? WHERE id=?", [final_qty, sid])
+        # B-038: Atomic status guard — prevents double-completion race condition
+        result = conn.execute("UPDATE production_sessions SET status='completed', end_time=CURRENT_TIMESTAMP, produced_quantity=? WHERE id=? AND status IN ('active','paused')", [final_qty, sid])
+        if result.rowcount == 0:
+            return {"status": 409, "body": {"error": "Session already completed or in invalid state"}}
         conn.execute("UPDATE session_workers SET scan_off_time=CURRENT_TIMESTAMP, is_active=0 WHERE session_id=? AND is_active=1", [sid])
         if session["order_item_id"]:
             # Sum ALL completed session quantities for this item (including this one)
@@ -4899,16 +4969,22 @@ def dispatch(method, path, params, body, conn):
               )
             ORDER BY o.updated_at DESC
         """).fetchall())
-        # Attach item_status_breakdown and progress to collections
-        for o in collections_raw:
-            item_rows = conn.execute(
-                "SELECT status, COUNT(*) as cnt FROM order_items WHERE order_id=? GROUP BY status",
-                [o["id"]]).fetchall()
-            breakdown = {r["status"]: r["cnt"] for r in item_rows}
-            total = sum(breakdown.values())
-            done = breakdown.get('F', 0) + breakdown.get('dispatched', 0)
-            o["item_status_breakdown"] = breakdown
-            o["progress"] = f"{done}/{total}" if total else "0/0"
+        # Batch: item_status_breakdown and progress for collections
+        if collections_raw:
+            col_ids = [o["id"] for o in collections_raw]
+            col_ph = ",".join("?" for _ in col_ids)
+            col_breakdown_map = {}
+            for r in conn.execute(
+                f"SELECT order_id, status, COUNT(*) as cnt FROM order_items WHERE order_id IN ({col_ph}) GROUP BY order_id, status",
+                col_ids
+            ).fetchall():
+                col_breakdown_map.setdefault(r["order_id"], {})[r["status"]] = r["cnt"]
+            for o in collections_raw:
+                breakdown = col_breakdown_map.get(o["id"], {})
+                total = sum(breakdown.values())
+                done = breakdown.get('F', 0) + breakdown.get('dispatched', 0)
+                o["item_status_breakdown"] = breakdown
+                o["progress"] = f"{done}/{total}" if total else "0/0"
         collections = collections_raw
         # Incoming production: orders with any item having eta_date set, still in pipeline
         incoming_raw = rows_to_list(conn.execute("""
@@ -4926,19 +5002,31 @@ def dispatch(method, path, params, body, conn):
               )
             ORDER BY o.eta_date ASC
         """).fetchall())
-        # Add item counts and item_status_breakdown for incoming production
-        for o in incoming_raw:
-            cnt = conn.execute("SELECT COUNT(*), COALESCE(SUM(quantity),0) FROM order_items WHERE order_id=?", [o["id"]]).fetchone()
-            o["item_count"] = cnt[0]
-            o["total_qty"] = cnt[1]
-            item_rows = conn.execute(
-                "SELECT status, COUNT(*) as cnt FROM order_items WHERE order_id=? GROUP BY status",
-                [o["id"]]).fetchall()
-            breakdown = {r["status"]: r["cnt"] for r in item_rows}
-            total = sum(breakdown.values())
-            done = breakdown.get('F', 0) + breakdown.get('dispatched', 0)
-            o["item_status_breakdown"] = breakdown
-            o["progress"] = f"{done}/{total}" if total else "0/0"
+        # Batch: item counts and status breakdown for incoming production
+        if incoming_raw:
+            inc_ids = [o["id"] for o in incoming_raw]
+            inc_ph = ",".join("?" for _ in inc_ids)
+            inc_counts = {}
+            for r in conn.execute(
+                f"SELECT order_id, COUNT(*), COALESCE(SUM(quantity),0) FROM order_items WHERE order_id IN ({inc_ph}) GROUP BY order_id",
+                inc_ids
+            ).fetchall():
+                inc_counts[r[0]] = {"item_count": r[1], "total_qty": r[2]}
+            inc_breakdown_map = {}
+            for r in conn.execute(
+                f"SELECT order_id, status, COUNT(*) as cnt FROM order_items WHERE order_id IN ({inc_ph}) GROUP BY order_id, status",
+                inc_ids
+            ).fetchall():
+                inc_breakdown_map.setdefault(r["order_id"], {})[r["status"]] = r["cnt"]
+            for o in incoming_raw:
+                ic = inc_counts.get(o["id"], {"item_count": 0, "total_qty": 0})
+                o["item_count"] = ic["item_count"]
+                o["total_qty"] = ic["total_qty"]
+                breakdown = inc_breakdown_map.get(o["id"], {})
+                total = sum(breakdown.values())
+                done = breakdown.get('F', 0) + breakdown.get('dispatched', 0)
+                o["item_status_breakdown"] = breakdown
+                o["progress"] = f"{done}/{total}" if total else "0/0"
         incoming = incoming_raw
         return {"status": 200, "body": {"date": date, "deliveries": deliveries, "collections": collections, "incoming_production": incoming}}
 
@@ -5128,19 +5216,30 @@ def dispatch(method, path, params, body, conn):
             ORDER BY COALESCE(dl.expected_date, '9999-12-31'), o.updated_at DESC
         """, [date_from, date_to]).fetchall())
 
-        for o in collections_raw:
-            item_rows = conn.execute(
-                "SELECT status, COUNT(*) as cnt FROM order_items WHERE order_id=? GROUP BY status",
-                [o["id"]]).fetchall()
-            breakdown = {r["status"]: r["cnt"] for r in item_rows}
-            total = sum(breakdown.values())
-            done = breakdown.get('F', 0) + breakdown.get('dispatched', 0)
-            o["progress"] = f"{done}/{total}" if total else "0/0"
-            o["all_finished"] = done == total
-            # Attach item list with SKU codes for collection cards
-            o["items"] = rows_to_list(conn.execute(
-                "SELECT id, sku_code, product_name, quantity, status FROM order_items WHERE order_id=?",
-                [o["id"]]).fetchall())
+        if collections_raw:
+            col2_ids = [o["id"] for o in collections_raw]
+            col2_ph = ",".join("?" for _ in col2_ids)
+            # Batch: status breakdowns
+            col2_bd_map = {}
+            for r in conn.execute(
+                f"SELECT order_id, status, COUNT(*) as cnt FROM order_items WHERE order_id IN ({col2_ph}) GROUP BY order_id, status",
+                col2_ids
+            ).fetchall():
+                col2_bd_map.setdefault(r["order_id"], {})[r["status"]] = r["cnt"]
+            # Batch: full item lists
+            col2_items_map = {}
+            for it in rows_to_list(conn.execute(
+                f"SELECT id, order_id, sku_code, product_name, quantity, status FROM order_items WHERE order_id IN ({col2_ph}) ORDER BY order_id, id",
+                col2_ids
+            ).fetchall()):
+                col2_items_map.setdefault(it["order_id"], []).append(it)
+            for o in collections_raw:
+                breakdown = col2_bd_map.get(o["id"], {})
+                total = sum(breakdown.values())
+                done = breakdown.get('F', 0) + breakdown.get('dispatched', 0)
+                o["progress"] = f"{done}/{total}" if total else "0/0"
+                o["all_finished"] = done == total
+                o["items"] = col2_items_map.get(o["id"], [])
 
         # Unassigned deliveries (no truck, but in date range)
         unassigned = [d for d in deliveries if not d.get("truck_id")]
@@ -7294,23 +7393,38 @@ def dispatch(method, path, params, body, conn):
             WHERE dl.truck_id = ? AND dl.expected_date = ?
             ORDER BY dl.load_sequence ASC, dl.id ASC
         """, [truck_id, date]).fetchall()
+        dl_all = rows_to_list(rows)
+        # Batch: pre-fetch items and stages for all deliveries
+        if dl_all:
+            dl_order_ids = list(set(r["order_id"] for r in dl_all if r.get("order_id")))
+            dl_ids = [r["id"] for r in dl_all]
+            # Batch items by order_id
+            items_by_order = {}
+            if dl_order_ids:
+                oi_ph = ",".join("?" for _ in dl_order_ids)
+                for it in rows_to_list(conn.execute(
+                    f"SELECT oi.*, s.name as sku_name FROM order_items oi LEFT JOIN skus s ON s.id=oi.sku_id WHERE oi.order_id IN ({oi_ph}) ORDER BY oi.order_id, oi.id",
+                    dl_order_ids
+                ).fetchall()):
+                    items_by_order.setdefault(it["order_id"], []).append(it)
+            # Batch stages by delivery_log_id
+            stages_by_dl = {}
+            dl_ph = ",".join("?" for _ in dl_ids)
+            for st in rows_to_list(conn.execute(
+                f"SELECT * FROM delivery_run_stages WHERE delivery_log_id IN ({dl_ph}) ORDER BY delivery_log_id, started_at",
+                dl_ids
+            ).fetchall()):
+                stages_by_dl.setdefault(st["delivery_log_id"], []).append(st)
         deliveries = []
-        for r in rows_to_list(rows):
-            # Get order items for each delivery
+        for r in dl_all:
             if r.get("order_id"):
-                items = rows_to_list(conn.execute(
-                    "SELECT oi.*, s.name as sku_name FROM order_items oi LEFT JOIN skus s ON s.id=oi.sku_id WHERE oi.order_id=? ORDER BY oi.id",
-                    [r["order_id"]]).fetchall())
+                items = items_by_order.get(r["order_id"], [])
                 r["items"] = items
                 r["total_qty"] = sum(it.get("quantity", 0) for it in items)
             else:
                 r["items"] = []
                 r["total_qty"] = 0
-            # Get stages for this delivery
-            stages = rows_to_list(conn.execute(
-                "SELECT * FROM delivery_run_stages WHERE delivery_log_id=? ORDER BY started_at",
-                [r["id"]]).fetchall())
-            r["stages"] = stages
+            r["stages"] = stages_by_dl.get(r["id"], [])
             deliveries.append(r)
         return {"status": 200, "body": deliveries}
 
@@ -7651,17 +7765,27 @@ def dispatch(method, path, params, body, conn):
             WHERE dl.truck_id = ? AND dl.expected_date = ?
             ORDER BY dl.load_sequence ASC, dl.id ASC
         """, [truck_id, date]).fetchall()
+        rp_list = rows_to_list(rows)
+        # Batch: pre-fetch items for all stops
+        rp_items_by_order = {}
+        if rp_list:
+            rp_order_ids = list(set(r["order_id"] for r in rp_list if r.get("order_id")))
+            if rp_order_ids:
+                rp_ph = ",".join("?" for _ in rp_order_ids)
+                for it in rows_to_list(conn.execute(
+                    f"SELECT oi.order_id, oi.sku_code, oi.product_name, oi.quantity FROM order_items oi WHERE oi.order_id IN ({rp_ph}) ORDER BY oi.order_id, oi.id",
+                    rp_order_ids
+                ).fetchall()):
+                    rp_items_by_order.setdefault(it["order_id"], []).append(it)
         stops = []
         cumulative_mins = 0
-        for r in rows_to_list(rows):
+        for r in rp_list:
             travel = r.get("estimated_travel_minutes") or r.get("estimated_minutes") or 30
             site_time = 30  # default 30 min at site
             cumulative_mins += travel + site_time
             r["cumulative_minutes"] = cumulative_mins
             r["estimated_arrival_minutes"] = cumulative_mins - site_time
-            items = rows_to_list(conn.execute(
-                "SELECT oi.sku_code, oi.product_name, oi.quantity FROM order_items oi WHERE oi.order_id=? ORDER BY oi.id",
-                [r.get("order_id")]).fetchall()) if r.get("order_id") else []
+            items = rp_items_by_order.get(r.get("order_id"), []) if r.get("order_id") else []
             r["items"] = items
             r["total_qty"] = sum(it.get("quantity", 0) for it in items)
             stops.append(r)
@@ -7707,11 +7831,20 @@ def dispatch(method, path, params, body, conn):
             ORDER BY dl.run_id ASC, dl.load_sequence ASC, dl.id ASC
         """, [truck_id, date]).fetchall()
         dl_list = rows_to_list(dl_rows)
+        # Batch: pre-fetch items for all stops in runsheet-v2
+        v2_items_by_order = {}
+        if dl_list:
+            v2_order_ids = list(set(s["order_id"] for s in dl_list if s.get("order_id")))
+            if v2_order_ids:
+                v2_ph = ",".join("?" for _ in v2_order_ids)
+                for it in rows_to_list(conn.execute(
+                    f"SELECT oi.order_id, oi.sku_code, oi.product_name, oi.quantity FROM order_items oi WHERE oi.order_id IN ({v2_ph}) ORDER BY oi.order_id, oi.id",
+                    v2_order_ids
+                ).fetchall()):
+                    v2_items_by_order.setdefault(it["order_id"], []).append(it)
         # Attach items to each stop
         for stop in dl_list:
-            items = rows_to_list(conn.execute(
-                "SELECT oi.sku_code, oi.product_name, oi.quantity FROM order_items oi WHERE oi.order_id=? ORDER BY oi.id",
-                [stop.get("order_id")]).fetchall()) if stop.get("order_id") else []
+            items = v2_items_by_order.get(stop.get("order_id"), []) if stop.get("order_id") else []
             stop["items"] = items
             stop["total_qty"] = sum(it.get("quantity", 0) for it in items)
             # Build readable address from component parts
@@ -8136,11 +8269,23 @@ def dispatch(method, path, params, body, conn):
                 LEFT JOIN clients c ON c.id=o.client_id
                 WHERE drc.driver_shift_id=? ORDER BY drc.calculated_at
             """, [shift_id]).fetchall()
+            cost_rows = rows_to_list(rows)
+            # Batch: pre-fetch pallet totals for all order_ids
+            cost_qty_map = {}
+            if cost_rows:
+                cost_oids = list(set(r["order_id"] for r in cost_rows if r.get("order_id")))
+                if cost_oids:
+                    cq_ph = ",".join("?" for _ in cost_oids)
+                    for cr in conn.execute(
+                        f"SELECT order_id, COALESCE(SUM(quantity), 0) FROM order_items WHERE order_id IN ({cq_ph}) GROUP BY order_id",
+                        cost_oids
+                    ).fetchall():
+                        cost_qty_map[cr[0]] = cr[1]
             results = []
             total_shift_cost = 0
-            for r in rows_to_list(rows):
+            for r in cost_rows:
                 if r.get("order_id"):
-                    total_qty = conn.execute("SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE order_id=?", [r["order_id"]]).fetchone()[0]
+                    total_qty = cost_qty_map.get(r["order_id"], 0)
                     r["total_pallets"] = total_qty
                     r["cost_per_pallet"] = round(r["total_cost"] / total_qty, 2) if total_qty else 0
                 total_shift_cost += r.get("total_cost", 0)
@@ -8269,6 +8414,7 @@ def dispatch(method, path, params, body, conn):
             pass        # Use a dedicated connection with FK checks disabled
         pconn = sqlite3.connect(DB_PATH, timeout=30)
         pconn.execute("PRAGMA foreign_keys = OFF")
+        pconn.execute("BEGIN EXCLUSIVE")  # B-039: Single atomic transaction for all deletes
         pconn.execute("PRAGMA journal_mode = WAL")
         pconn.execute("PRAGMA busy_timeout = 10000")
         tables_to_purge = [
@@ -8302,14 +8448,11 @@ def dispatch(method, path, params, body, conn):
         for t in tables_to_purge:
             try:
                 pconn.execute(f"DELETE FROM {t}")
-                pconn.commit()
                 purged.append(t)
             except Exception:
-                try:
-                    pconn.rollback()
-                except Exception:
-                    pass
-        # Record the purge action
+                pass  # Table might not exist — skip and continue
+        pconn.commit()  # B-039: Single atomic commit for entire purge
+        # Record the purge action (audit_log was just cleared, but re-insert for this session)
         try:
             pconn.execute("INSERT INTO audit_log (user_id, action, entity_type, details) VALUES (?, 'purge_all_data', 'system', ?)",
                 [current_user["id"], json.dumps({"tables_cleared": purged})])

@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hyne Pallets — Manufacturing Management</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" integrity="sha384-tMH8h3BGESGckSAVGZ82T9n90ztNXxvdwvdM6UoR56cYcf+0iGXBliJ29D+wZ/x8" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" integrity="sha384-bm7MnzvK++ykSwVJ2tynSE5TRdN+xL418osEVF2DE/L/gfWHj91J2Sphe582B1Bh" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js" integrity="sha384-AISI5AuDG6E8DeEiFMVB3rGQxhZt24OU0avMp+GMV64+tpnA3+Z6F5MT0f96iPva" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js" integrity="sha384-XH+ZCkuxxIrxQG0DVKQhb5v4zo16WNolye2PWC/djwSjCXKORYyqyF46I6Hoo0GT" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="style.css" />
 
   <script>
@@ -29,6 +29,7 @@
 <body style="margin:0;padding:0;background:#F5F7FA;font-family:'Segoe UI',system-ui,sans-serif;">
 
 <div id="root"></div>
+<div id="confirm-modal-root"></div>
 <div id="toast-container"></div>
 
 <script type="text/babel">
@@ -60,6 +61,11 @@ const api = async (path, options = {}, token = null) => {
   let data;
   try { data = JSON.parse(text); } catch { data = { error: text }; }
   if (!res.ok) {
+    if (res.status === 401) {
+      // Token expired or invalid — clear session and redirect to login
+      const event = new CustomEvent('session-expired');
+      window.dispatchEvent(event);
+    }
     throw new Error(data.error || `HTTP ${res.status}`);
   }
   return data;
@@ -74,6 +80,51 @@ const toast = (msg, type = 'info') => {
   el.textContent = msg;
   document.getElementById('toast-container').appendChild(el);
   setTimeout(() => el.remove(), 3500);
+};
+
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIRM MODAL (replaces window.confirm for PWA compatibility)
+// ═══════════════════════════════════════════════════════════════
+let _confirmResolve = null;
+const confirmAction = (message, { title = 'Confirm', confirmText = 'Confirm', cancelText = 'Cancel', danger = false, requireType = null } = {}) => {
+  return new Promise((resolve) => {
+    _confirmResolve = resolve;
+    const root = document.getElementById('confirm-modal-root');
+    if (!root) { resolve(window.confirm(message)); return; }
+    const render = () => {
+      root.innerHTML = '';
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      const card = document.createElement('div');
+      card.style.cssText = 'background:white;border-radius:12px;padding:28px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);';
+      card.innerHTML = `
+        <h3 style="margin:0 0 12px;font-size:19px;font-weight:700;color:#07324C;">${title}</h3>
+        <p style="margin:0 0 20px;color:#4b5563;font-size:15px;line-height:1.5;">${message}</p>
+        ${requireType ? `<div style="margin-bottom:16px;"><label style="font-size:13px;color:#6b7280;font-weight:600;">Type <strong>"${requireType}"</strong> to confirm:</label><input id="confirm-type-input" type="text" style="width:100%;padding:10px 12px;border:2px solid #d1d5db;border-radius:8px;font-size:15px;margin-top:6px;" autocomplete="off" /></div>` : ''}
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="confirm-cancel-btn" style="padding:10px 20px;border-radius:8px;border:1px solid #d1d5db;background:white;color:#374151;font-weight:600;font-size:15px;cursor:pointer;">${cancelText}</button>
+          <button id="confirm-ok-btn" style="padding:10px 20px;border-radius:8px;border:none;background:${danger ? '#ED1C24' : '#07324C'};color:white;font-weight:600;font-size:15px;cursor:pointer;${requireType ? 'opacity:0.4;pointer-events:none;' : ''}">${confirmText}</button>
+        </div>`;
+      overlay.appendChild(card);
+      root.appendChild(overlay);
+      const cleanup = (result) => { root.innerHTML = ''; _confirmResolve = null; resolve(result); };
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+      card.querySelector('#confirm-cancel-btn').addEventListener('click', () => cleanup(false));
+      const okBtn = card.querySelector('#confirm-ok-btn');
+      if (requireType) {
+        const inp = card.querySelector('#confirm-type-input');
+        inp.addEventListener('input', () => {
+          const match = inp.value.trim().toUpperCase() === requireType.toUpperCase();
+          okBtn.style.opacity = match ? '1' : '0.4';
+          okBtn.style.pointerEvents = match ? 'auto' : 'none';
+        });
+        inp.focus();
+      }
+      okBtn.addEventListener('click', () => cleanup(true));
+    };
+    render();
+  });
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -1132,7 +1183,7 @@ const OfficeDashboard = ({ token }) => {
 
   const toggleDeliveryType = async (order) => {
     const newType = order.delivery_type === 'collection' ? 'delivery' : 'collection';
-    if (!window.confirm(`Switch order ${order.order_number} to ${newType.charAt(0).toUpperCase() + newType.slice(1)}?`)) return;
+    if (!(await confirmAction(`Switch order ${order.order_number} to ${newType.charAt(0).toUpperCase() + newType.slice(1)}?`, { title: 'Change Order Type' }))) return;
     try {
       await api(`/orders/${order.id}/delivery-type`, { method: 'PUT', body: JSON.stringify({ delivery_type: newType }) }, token);
       toast(`Switched to ${newType}`, 'success');
@@ -2905,7 +2956,7 @@ const PlanningBoard = ({ token, user }) => {
                     } catch(e) { toast(e.message, 'error'); }
                   }}
                   onAllocateInventory={async (item) => {
-                    if(!window.confirm('Allocate inventory to this order item? This will bypass production and mark as Ready to Dispatch.')) return;
+                    if(!(await confirmAction('Allocate inventory to this order item? This will bypass production and mark as Ready to Dispatch.', { title: 'Allocate Inventory' }))) return;
                     try {
                       // Try full-order allocation first; fall back to item-level
                       try {
@@ -3098,7 +3149,7 @@ const PlanningBoard = ({ token, user }) => {
                                     } catch(err) { toast(err.message, 'error'); }
                                   }}
                                   onAllocateInventory={async (e) => {
-                                    if(!window.confirm('Allocate inventory to this work order item? This will bypass production and mark as Ready to Dispatch.')) return;
+                                    if(!(await confirmAction('Allocate inventory to this work order item? This will bypass production and mark as Ready to Dispatch.', { title: 'Allocate Inventory' }))) return;
                                     try {
                                       await api('/inventory-allocate', {method:'POST', body:JSON.stringify({order_item_id: e.order_item_id || e.id})}, token);
                                       toast('Inventory allocated — ready for dispatch', 'success');
@@ -5239,7 +5290,7 @@ const DispatchDashboard = ({ token }) => {
 
   const toggleDispatchDeliveryType = async (orderId, currentType) => {
     const newType = currentType === 'collection' ? 'delivery' : 'collection';
-    if (!window.confirm(`Switch to ${newType}?`)) return;
+    if (!(await confirmAction(`Switch to ${newType}?`, { title: 'Change Dispatch Type' }))) return;
     try {
       await api(`/orders/${orderId}/delivery-type`, { method: 'PUT', body: JSON.stringify({ delivery_type: newType }) }, token);
       toast(`Switched to ${newType}`, 'success');
@@ -5962,12 +6013,12 @@ const DispatchDashboard = ({ token }) => {
                                         <span style={{fontSize:12,fontWeight:800,color:'#dc2626'}}>Delivered</span>
                                       ) : run.entries?.length > 0 ? (
                                         <button
-                                          onClick={() => { if(window.confirm(`Confirm dispatch Run ${run.run_number}?`)) api(`/dispatch-runs/${run.id}/dispatch`,{method:'PUT'},token).then(()=>{toast('Dispatched!','success');reload();}).catch(e=>toast(e.message,'error')); }}
+                                          onClick={async () => { if(await confirmAction(`Confirm dispatch Run ${run.run_number}?`, { title: 'Dispatch Run', confirmText: 'Dispatch' })) api(`/dispatch-runs/${run.id}/dispatch`,{method:'PUT'},token).then(()=>{toast('Dispatched!','success');reload();}).catch(e=>toast(e.message,'error')); }}
                                           style={{fontSize:12,padding:'2px 7px',borderRadius:4,background:'#07324C',color:'white',border:'none',cursor:'pointer',fontWeight:700}}
                                         >🚚 Dispatch</button>
                                       ) : null}
                                       <button
-                                        onClick={() => { if(window.confirm(`Delete Run ${run.run_number}?`)) api(`/dispatch-runs/${run.id}`,{method:'DELETE'},token).then(()=>{toast('Run deleted','success');reload();}).catch(e=>toast(e.message,'error')); }}
+                                        onClick={async () => { if(await confirmAction(`Delete Run ${run.run_number}?`, { title: 'Delete Run', confirmText: 'Delete', danger: true })) api(`/dispatch-runs/${run.id}`,{method:'DELETE'},token).then(()=>{toast('Run deleted','success');reload();}).catch(e=>toast(e.message,'error')); }}
                                         style={{fontSize:12,padding:'1px 5px',borderRadius:3,background:'#fee2e2',color:'#dc2626',border:'none',cursor:'pointer',fontWeight:700}}
                                         title="Delete run"
                                       >×</button>
@@ -7724,7 +7775,7 @@ const AdminPage = ({ token }) => {
                     const pw = document.getElementById('sec-reset-pw').value;
                     if (!uid) { toast('Select a user', 'error'); return; }
                     if (!pw || pw.length < 6) { toast('Password must be at least 6 characters', 'error'); return; }
-                    if (!window.confirm('Reset this user\'s password?')) return;
+                    if (!(await confirmAction('Reset this user\'s password? They will need to use the new password to log in.', { title: 'Reset Password', confirmText: 'Reset Password', danger: true }))) return;
                     try {
                       const res = await api('/admin/change-password', { method:'POST', body:JSON.stringify({ user_id: parseInt(uid), new_password: pw }) }, token);
                       toast(res.message || 'Password reset', 'success');
@@ -7769,7 +7820,7 @@ const AdminPage = ({ token }) => {
                     toast('Please type "PURGE ALL DATA" to confirm', 'error');
                     return;
                   }
-                  if (!window.confirm('FINAL WARNING: This will permanently delete ALL production data. This cannot be undone. Continue?')) return;
+                  if (!(await confirmAction('This will permanently delete ALL production data, work orders, schedules, production sessions, delivery logs, and audit history. This action cannot be undone.', { title: 'Purge All Data', confirmText: 'Purge Everything', danger: true, requireType: 'DELETE ALL DATA' }))) return;
                   try {
                     const res = await api('/admin/purge-data', { method: 'POST', body: JSON.stringify({confirmation_token: 'CONFIRM-PURGE-ALL-DATA'}) }, token);
                     toast(`Production data purged — ${(res.tables_cleared||[]).length} tables cleared`, 'success');
@@ -7986,7 +8037,7 @@ const TimberAdminSection = ({ token }) => {
   };
 
   const deleteTestData = async () => {
-    if (!window.confirm('Delete ALL test timber data? This cannot be undone.')) return;
+    if (!(await confirmAction('Delete ALL test timber data? This cannot be undone.', { title: 'Delete Timber Data', confirmText: 'Delete', danger: true }))) return;
     try {
       await api('/timber/test-data', { method: 'DELETE' }, token);
       toast('Test data deleted', 'info');
@@ -9266,7 +9317,7 @@ const ActiveDeliveryView = ({ delivery, token, user, onComplete }) => {
   };
 
   const completeDelivery = async () => {
-    if (!window.confirm('Mark this delivery as complete? All unassigned packs will remain unassigned.')) return;
+    if (!(await confirmAction('Mark this delivery as complete? All unassigned packs will remain unassigned.', { title: 'Complete Delivery', confirmText: 'Complete' }))) return;
     setCompleting(true);
     try {
       await api(`/timber/deliveries/${delivery.id}/complete`, { method: 'POST' }, token);
@@ -10152,6 +10203,13 @@ const App = () => {
 
   const handleLogout = () => { setUser(null); setToken(null); setPage('dashboard'); };
 
+  // F-011: Listen for session expiry and auto-logout
+  useEffect(() => {
+    const handler = () => { toast('Session expired — please log in again', 'error'); handleLogout(); };
+    window.addEventListener('session-expired', handler);
+    return () => window.removeEventListener('session-expired', handler);
+  }, []);
+
   const handleNav = (p) => {
     setPage(p);
     if (['floor','chainsaw','receiving'].includes(p)) setSidebarCollapsed(true);
@@ -10162,6 +10220,11 @@ const App = () => {
   if (!user) return <LoginPage onLogin={handleLogin} />;
 
   const renderPage = () => {
+    // F-005: Role-based page access guard (defence-in-depth alongside server-side checks)
+    const navItem = NAV_ITEMS.find(n => n.id === page);
+    if (navItem && !navItem.roles.includes(user.role) && user.role !== 'executive') {
+      return <div style={{padding:40,textAlign:'center'}}><h2 style={{color:'#ED1C24'}}>Access Denied</h2><p>Your role ({user.role}) does not have access to this page.</p></div>;
+    }
     switch(page) {
       case 'dashboard': return <Dashboard token={token} />;
       case 'office': return <OfficeDashboard token={token} />;
